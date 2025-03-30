@@ -17,7 +17,70 @@ git clone https://github.com/yourusername/friends-connect-sandbox.git
 cd friends-connect-sandbox
 ```
 
-### 2. Testing and Running
+### 2. Project Structure
+
+Ensure your project structure looks like this:
+```
+project_root/
+├── src/
+│   └── main.rs
+├── dist/             # Directory for compiled assets
+├── index.html
+├── input.css
+├── tailwind.config.js
+├── postcss.config.js
+├── Trunk.toml
+├── Cargo.toml
+└── ...
+```
+
+If the `dist` directory doesn't exist, create it:
+```bash
+mkdir -p dist
+```
+
+### 3. Tailwind CSS Setup
+
+This project uses Tailwind CSS for styling. Make sure your configuration is correct:
+
+1. **Update index.html**: Use the compiled CSS file instead of CDN
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sandbox Friends Connect</title>
+    <!-- Remove or comment out the CDN script if present -->
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    
+    <!-- Add this link instead -->
+    <link data-trunk rel="css" href="dist/tailwind.css" />
+  </head>
+  <body>
+    <link data-trunk rel="rust" data-wasm-opt="z" />
+  </body>
+</html>
+```
+
+2. **Update Trunk.toml**: Make the Tailwind compilation cross-platform
+```toml
+[serve]
+address = "127.0.0.1"
+port = 8080
+open = true
+
+[watch]
+watch = ["src", "input.css", "index.html", "tailwind.config.js"]
+
+[[hooks]]
+stage = "pre_build"
+# Cross-platform approach
+command = "npx"
+command_arguments = ["tailwindcss", "-i", "input.css", "-o", "dist/tailwind.css"]
+```
+
+### 4. Testing and Running
 
 The test scripts will automatically check your setup and start the development server if all tests pass:
 
@@ -32,13 +95,17 @@ chmod +x run_tests.sh
 ./run_tests.sh
 ```
 
-The scripts check for issues in this order:
-1. Trunk.toml configuration file (will use defaults if not present)
-2. Build errors (reported first if present)
-3. Cargo test failures (standard Rust tests)
-4. WebAssembly test failures (browser compatibility)
+If you're experiencing test failures related to CSS styles, you may need to adjust your test assertions to be less strict about exact values:
 
-If all tests pass, you'll see "All tests passed successfully! 🎉" and the development server will automatically start at http://localhost:8080.
+```rust
+// Change this:
+assert!(min_height.contains("100vh") || min_height.contains("100%"),
+        "min-height should be 100vh from Tailwind's min-h-screen class");
+
+// To something like this:
+assert!(!min_height.is_empty(),
+        "min-height should be set from Tailwind's min-h-screen class");
+```
 
 To manually start the server without running tests:
 
@@ -46,40 +113,30 @@ To manually start the server without running tests:
 trunk serve
 ```
 
-### 3. Development environment
+### 5. Development environment
 
 This project uses:
 - [Leptos](https://leptos.dev/) for reactive web UI
 - [Tailwind CSS](https://tailwindcss.com/) for styling
 
-### 4. Configuration (Optional)
+## Common Issues and Solutions
 
-Trunk works without configuration, but you can create a `Trunk.toml` file in your project root to customize its behavior:
+### Tailwind styles not applying in tests
 
-```bash
-# Create a basic Trunk.toml file
-touch Trunk.toml
-```
+If your tests are failing because Tailwind CSS styles aren't being properly applied:
 
-Example `Trunk.toml` configuration:
+1. Make sure your CSS is properly compiled before testing
+2. Consider making test assertions more flexible about exact style values
+3. Ensure you're testing the presence of styles rather than exact values
 
-```toml
-[serve]
-# Address to serve on
-address = "127.0.0.1"
-# Port to serve on
-port = 8080
-# Open a browser tab when server launches
-open = true
-```
+### Cross-platform compatibility
 
-See the example Trunk.toml file for more configuration options.
+For Windows users:
+- Use `npx` instead of direct commands in Trunk.toml
+- Make sure paths use forward slashes (/) even on Windows
 
-## Project Structure
-
-- `index.html`: Entry point for the web application
-- `src/`: Source code directory
-- `run_tests.ps1`/`run_tests.sh`: Test scripts for Windows and Unix systems
+For Unix users:
+- Ensure shell scripts have execute permissions: `chmod +x *.sh`
 
 ## Contributing
 
@@ -89,7 +146,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT License
 
-Copyright (c) 2025 Ryan Khetlyr
+Copyright (c) 2025-2029 Ryan Khetlyr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

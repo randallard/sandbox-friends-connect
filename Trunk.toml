@@ -1,0 +1,15 @@
+[serve]
+# Address to serve on
+address = "127.0.0.1"
+# Port to serve on
+port = 8080
+# Open a browser tab when server launches
+open = true
+
+[watch]
+watch = ["src", "input.css", "index.html", "tailwind.config.js"]
+
+[[hooks]]
+stage = "pre_build"
+command = "cmd"
+command_arguments = ["/c", "npx tailwindcss -i input.css -o dist/tailwind.css"]
