@@ -17,9 +17,9 @@ git clone https://github.com/yourusername/friends-connect-sandbox.git
 cd friends-connect-sandbox
 ```
 
-### 2. Testing
+### 2. Testing and Running
 
-Testing your changes early helps identify issues in a clear progression:
+The test scripts will automatically check your setup and start the development server if all tests pass:
 
 **Windows:**
 ```
@@ -32,28 +32,48 @@ chmod +x run_tests.sh
 ./run_tests.sh
 ```
 
-The test scripts will check for issues in this order:
-1. Build errors (reported first if present)
-2. Cargo test failures (standard Rust tests)
-3. WebAssembly test failures (browser compatibility)
+The scripts check for issues in this order:
+1. Trunk.toml configuration file (will use defaults if not present)
+2. Build errors (reported first if present)
+3. Cargo test failures (standard Rust tests)
+4. WebAssembly test failures (browser compatibility)
 
-If all tests pass, you'll see "All tests passed successfully! 🎉"
+If all tests pass, you'll see "All tests passed successfully! 🎉" and the development server will automatically start at http://localhost:8080.
 
-### 3. Running the development server
-
-Once tests are passing, start the local development server:
+To manually start the server without running tests:
 
 ```bash
 trunk serve
 ```
 
-This will compile and serve the application, typically at http://localhost:8080
-
-### 4. Development environment
+### 3. Development environment
 
 This project uses:
 - [Leptos](https://leptos.dev/) for reactive web UI
 - [Tailwind CSS](https://tailwindcss.com/) for styling
+
+### 4. Configuration (Optional)
+
+Trunk works without configuration, but you can create a `Trunk.toml` file in your project root to customize its behavior:
+
+```bash
+# Create a basic Trunk.toml file
+touch Trunk.toml
+```
+
+Example `Trunk.toml` configuration:
+
+```toml
+[serve]
+# Address to serve on
+address = "127.0.0.1"
+# Port to serve on
+port = 8080
+# Open a browser tab when server launches
+open = true
+```
+
+See the example Trunk.toml file for more configuration options.
 
 ## Project Structure
 
@@ -69,7 +89,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT License
 
-Copyright (c) 2025 [Your Name]
+Copyright (c) 2025 Ryan Khetlyr
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
