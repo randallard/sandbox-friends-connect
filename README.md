@@ -23,7 +23,9 @@ Ensure your project structure looks like this:
 ```
 project_root/
 ├── src/
-│   └── main.rs
+│   ├── main.rs
+│   ├── app.rs
+│   └── test_utils.rs
 ├── dist/             # Directory for compiled assets
 ├── index.html
 ├── input.css
@@ -80,9 +82,11 @@ command = "npx"
 command_arguments = ["tailwindcss", "-i", "input.css", "-o", "dist/tailwind.css"]
 ```
 
-### 4. Testing and Running
+### 4. Running Tests
 
-The test scripts will automatically check your setup and start the development server if all tests pass:
+You can run tests using the provided scripts or manually:
+
+#### Using the test scripts:
 
 **Windows:**
 ```
@@ -95,23 +99,34 @@ chmod +x run_tests.sh
 ./run_tests.sh
 ```
 
-If you're experiencing test failures related to CSS styles, you may need to adjust your test assertions to be less strict about exact values:
+#### Running tests manually:
 
-```rust
-// Change this:
-assert!(min_height.contains("100vh") || min_height.contains("100%"),
-        "min-height should be 100vh from Tailwind's min-h-screen class");
-
-// To something like this:
-assert!(!min_height.is_empty(),
-        "min-height should be set from Tailwind's min-h-screen class");
+**Standard Rust tests:**
+```bash
+cargo test
 ```
 
-To manually start the server without running tests:
+**WebAssembly tests:**
+```bash
+# Run in Chrome (headless)
+wasm-pack test --chrome --headless
+
+# Run in Chrome (with browser UI)
+wasm-pack test --chrome
+
+# Run in Firefox (headless)
+wasm-pack test --firefox --headless
+```
+
+### 5. Running the Development Server
+
+To start the development server:
 
 ```bash
 trunk serve
 ```
+
+The application will be available at `http://localhost:8080` by default.
 
 ### 5. Development environment
 
@@ -120,14 +135,6 @@ This project uses:
 - [Tailwind CSS](https://tailwindcss.com/) for styling
 
 ## Common Issues and Solutions
-
-### Tailwind styles not applying in tests
-
-If your tests are failing because Tailwind CSS styles aren't being properly applied:
-
-1. Make sure your CSS is properly compiled before testing
-2. Consider making test assertions more flexible about exact style values
-3. Ensure you're testing the presence of styles rather than exact values
 
 ### Cross-platform compatibility
 
