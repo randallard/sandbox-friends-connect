@@ -109,6 +109,8 @@ mod tests {
     use wasm_bindgen_test::*;
     use std::path::Path;
     use std::fs;
+    use gloo_timers::future::TimeoutFuture;
+    use wasm_bindgen::JsCast;
 
     wasm_bindgen_test_configure!(run_in_browser);
     
@@ -117,6 +119,15 @@ mod tests {
         document.query_selector(&format!("[data-test-id='{}']", test_id))
             .unwrap()
             .expect(&format!("Element with data-test-id='{}' not found", test_id))
+    }
+    
+    // Helper method to click an element and wait for reactivity
+    async fn click_and_wait(element: &web_sys::Element, timeout_ms: u32) {
+        let event = web_sys::MouseEvent::new("click").unwrap();
+        element.dispatch_event(&event).unwrap();
+        
+        // Wait for the specified timeout to allow reactivity to complete
+        let _ = TimeoutFuture::new(timeout_ms).await;
     }
 
     #[test]
@@ -167,7 +178,7 @@ mod tests {
     }
     
     #[wasm_bindgen_test]
-    fn test_app_says_hello_leptos() {
+    async fn test_app_says_hello_leptos() {
         // Mount the App component to the body
         mount_to_body(|| view! { <App /> });
         
@@ -177,7 +188,7 @@ mod tests {
     }
     
     #[wasm_bindgen_test]
-    fn test_tailwind_classes_applied() {
+    async fn test_tailwind_classes_applied() {
         // Mount the App component to the body
         mount_to_body(|| view! { <App /> });
         
@@ -205,7 +216,7 @@ mod tests {
     }
     
     #[wasm_bindgen_test]
-    fn test_dark_mode_toggle_exists() {
+    async fn test_dark_mode_toggle_exists() {
         // Mount the App component to the body
         mount_to_body(|| view! { <App /> });
         
@@ -217,7 +228,7 @@ mod tests {
     }
 
     #[wasm_bindgen_test]
-    fn test_dark_mode_toggle_changes_theme() {
+    async fn test_dark_mode_toggle_changes_theme() {
         // Mount the App component to the body
         mount_to_body(|| view! { <App /> });
         
@@ -231,16 +242,15 @@ mod tests {
         assert!(!container.class_list().contains("dark"), 
                 "Container should start in light mode");
         
-        // Click the toggle
-        let event = web_sys::MouseEvent::new("click").unwrap();
-        dark_mode_toggle.dispatch_event(&event).unwrap();
+        // Click the toggle and wait for reactivity
+        click_and_wait(&dark_mode_toggle, 100).await;
         
         // Check that the theme has changed
         assert!(container.class_list().contains("dark"), 
                 "Container should switch to dark mode after toggle click");
         
-        // Click the toggle again
-        dark_mode_toggle.dispatch_event(&event).unwrap();
+        // Click the toggle again and wait for reactivity
+        click_and_wait(&dark_mode_toggle, 100).await;
         
         // Check that the theme has changed back
         assert!(!container.class_list().contains("dark"), 
