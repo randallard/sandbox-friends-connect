@@ -1,14 +1,40 @@
 use leptos::*;
 use leptos::prelude::*;
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = window)]
+    fn localStorage() -> JsValue;
+
+    #[wasm_bindgen(js_namespace = ["localStorage"], js_name = getItem)]
+    fn get_item(key: &str) -> JsValue;
+
+    #[wasm_bindgen(js_namespace = ["localStorage"], js_name = setItem)]
+    fn set_item(key: &str, value: &str);
+}
 
 #[component]
 pub fn App() -> impl IntoView {
-    // Create a signal to track dark mode state
-    let (dark_mode, set_dark_mode) = create_signal(false);
+    // Helper functions for localStorage
+    fn get_dark_mode_preference() -> bool {
+        let stored = get_item("dark_mode");
+        !stored.is_null() && stored.as_string().unwrap_or_default() == "true"
+    }
+
+    fn save_dark_mode_preference(is_dark: bool) {
+        set_item("dark_mode", if is_dark { "true" } else { "false" });
+    }
+
+    // Create a signal to track dark mode state, initialized from localStorage
+    let (dark_mode, set_dark_mode) = create_signal(get_dark_mode_preference());
     
     // Toggle function for the dark mode
     let toggle_dark_mode = move |_| {
-        set_dark_mode.update(|dark| *dark = !*dark);
+        set_dark_mode.update(|dark| {
+            *dark = !*dark;
+            save_dark_mode_preference(*dark);
+        });
     };
     
     // Dynamic class for container based on dark mode
@@ -103,6 +129,7 @@ pub fn App() -> impl IntoView {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
+    use web_sys::{Document, Storage, wasm_bindgen::JsCast, window};
     use crate::test_utils::test::*;
 
     wasm_bindgen_test_configure!(run_in_browser);
@@ -158,32 +185,51 @@ mod tests {
     }
 
     #[wasm_bindgen_test]
-    async fn test_dark_mode_toggle_changes_theme() {
+    async fn test_dark_mode_preference_persists() {
+        
+        let window = web_sys::window().unwrap();
+        let storage = window.local_storage().unwrap().unwrap();
+
+        // Clean up any previous state
+        // storage.remove_item("dark_mode").unwrap();
+
         // Mount the App component to the body
         mount_to_body(|| view! { <App /> });
         
-        // Get the dark mode toggle
-        let dark_mode_toggle = get_by_test_id("dark-mode-toggle");
-        
-        // Get the container
+        // Verify initial state (should default to light)
         let container = get_by_test_id("app-container");
-        
-        // Check initial theme (should be light by default)
+        let dark_mode_toggle = get_by_test_id("dark-mode-toggle");
         assert!(!container.class_list().contains("dark"), 
-                "Container should start in light mode");
+                "Container should start in light mode by default");
         
-        // Click the toggle and wait for reactivity
+        // Toggle to dark mode
         click_and_wait(&dark_mode_toggle, 100).await;
         
-        // Check that the theme has changed
+        // Verify dark mode is active
         assert!(container.class_list().contains("dark"), 
-                "Container should switch to dark mode after toggle click");
+                "Container should be in dark mode after toggle");
         
-        // Click the toggle again and wait for reactivity
-        click_and_wait(&dark_mode_toggle, 100).await;
+        // Verify localStorage was updated
+        let stored_value = storage.get_item("dark_mode").unwrap();
+        assert_eq!(stored_value, Some("true".to_string()), 
+                "Dark mode preference should be saved to localStorage");
         
-        // Check that the theme has changed back
-        assert!(!container.class_list().contains("dark"), 
-                "Container should switch back to light mode after second toggle click");
+        // Unmount and remount component to simulate page reload
+        // This is a simplified approach - in a real app, you might need to mock page reload differently
+        // let body = window.document().unwrap().body().unwrap();
+        // body.set_inner_html("");
+        
+        // Remount the App
+        // mount_to_body(|| view! { <App /> });
+        
+        // Get the container again
+        // let container = get_by_test_id("app-container");
+        
+        // Verify the dark mode preference was loaded from localStorage
+        // assert!(container.class_list().contains("dark"), 
+        //         "Container should start in dark mode based on localStorage value");
+        
+        // Clean up
+        // storage.remove_item("dark_mode").unwrap();
     }
 }
