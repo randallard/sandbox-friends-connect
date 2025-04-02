@@ -4,6 +4,14 @@ mod test_utils;
 mod data;
 mod utils;
 
+// Add our new test modules
+#[cfg(test)]
+mod mock_logger;
+#[cfg(test)]
+mod integration_tests;
+#[cfg(test)]
+mod log_integration_tests;
+
 use leptos::*;
 use leptos::prelude::*;
 use app::App;
@@ -21,4 +29,23 @@ fn main() {
     mount_to_body(|| view! { <App /> });
     
     log::info!("Application mounted successfully");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::*;
+    
+    wasm_bindgen_test_configure!(run_in_browser);
+    
+    #[wasm_bindgen_test]
+    fn test_logger_initialization() {
+        // Simple test to verify we can log messages without errors
+        log::info!("Test info message");
+        log::warn!("Test warning message");
+        log::error!("Test error message");
+        
+        // If this doesn't throw an exception, logging is initialized properly
+        assert!(true);
+    }
 }

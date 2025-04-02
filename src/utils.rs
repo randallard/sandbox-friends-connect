@@ -81,3 +81,233 @@ pub fn get_dark_mode_preference() -> bool {
 pub fn save_dark_mode_preference(is_dark: bool) -> Result<(), StorageError> {
     set_storage_item("dark_mode", if is_dark { "true" } else { "false" })
 }
+
+// Add these tests to the bottom of utils.rs
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::*;
+    use crate::test_utils::test::*;
+    use std::rc::Rc;
+    use leptos::prelude::*;
+    use web_sys::{Element, HtmlElement};
+    use wasm_bindgen::JsCast;
+    use gloo_timers::future::TimeoutFuture;
+    use web_sys::console;
+
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    // Helper function to reset localStorage for tests
+    async fn reset_storage() {
+        if let Ok(storage) = get_storage() {
+            let _ = storage.remove_item("dark_mode");
+            let _ = storage.remove_item("player_id");
+            // Wait a bit for storage operations to complete
+            TimeoutFuture::new(50).await;
+        }
+    }
+
+    // Test component to observe logging
+    #[component]
+    fn LogTestComponent() -> impl IntoView {
+        let log_action = move |_| {
+            info!("Info log message from test");
+            warn!("Warning log message from test");
+            error!("Error log message from test");
+        };
+
+        view! {
+            <div>
+                <button 
+                    data-test-id="log-button"
+                    on:click=log_action
+                >
+                    "Log Test"
+                </button>
+            </div>
+        }
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_get_storage_returns_storage() {
+        let storage_result = get_storage();
+        assert!(storage_result.is_ok(), "Should successfully get localStorage");
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_get_storage_item() {
+        reset_storage().await;
+
+        // First, set a test item
+        let test_key = "test_key";
+        let test_value = "test_value";
+        let storage = get_storage().unwrap();
+        let _ = storage.set_item(test_key, test_value);
+
+        // Then test getting it
+        let result = get_storage_item(test_key);
+        assert!(result.is_ok(), "Should not return an error");
+        assert_eq!(result.unwrap(), Some(test_value.to_string()), 
+            "Should retrieve the correct value");
+
+        // Clean up
+        let _ = storage.remove_item(test_key);
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_set_storage_item() {
+        reset_storage().await;
+
+        let test_key = "test_key";
+        let test_value = "test_value";
+
+        // Test setting an item
+        let result = set_storage_item(test_key, test_value);
+        assert!(result.is_ok(), "Should successfully set item in localStorage");
+
+        // Verify it was set correctly
+        let storage = get_storage().unwrap();
+        let stored_value = storage.get_item(test_key).unwrap();
+        assert_eq!(stored_value, Some(test_value.to_string()), 
+            "Value should be stored correctly in localStorage");
+
+        // Clean up
+        let _ = storage.remove_item(test_key);
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_remove_storage_item() {
+        reset_storage().await;
+
+        let test_key = "test_key";
+        let test_value = "test_value";
+
+        // First set an item
+        let storage = get_storage().unwrap();
+        let _ = storage.set_item(test_key, test_value);
+
+        // Test removing it
+        let result = remove_storage_item(test_key);
+        assert!(result.is_ok(), "Should successfully remove item from localStorage");
+
+        // Verify it was removed
+        let stored_value = storage.get_item(test_key).unwrap();
+        assert_eq!(stored_value, None, "Item should be removed from localStorage");
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_generate_player_id() {
+        let id1 = generate_player_id();
+        let id2 = generate_player_id();
+
+        // Test that IDs are non-empty
+        assert!(!id1.is_empty(), "Generated ID should not be empty");
+        
+        // Test that IDs are unique
+        assert_ne!(id1, id2, "Generated IDs should be unique");
+        
+        // Test that IDs are valid UUIDs (36 characters with 4 hyphens)
+        assert_eq!(id1.len(), 36, "Generated ID should be 36 characters long");
+        assert_eq!(id1.chars().filter(|&c| c == '-').count(), 4, 
+            "Generated ID should contain 4 hyphens");
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_get_player_id() {
+        reset_storage().await;
+
+        // First call should generate a new ID
+        let id1 = get_player_id();
+        assert!(!id1.is_empty(), "get_player_id should return a non-empty ID");
+        
+        // Second call should return the same ID
+        let id2 = get_player_id();
+        assert_eq!(id1, id2, "get_player_id should return the same ID on subsequent calls");
+
+        // Verify it was stored in localStorage
+        let storage = get_storage().unwrap();
+        let stored_id = storage.get_item("player_id").unwrap();
+        assert_eq!(stored_id, Some(id1), "ID should be stored in localStorage");
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_get_dark_mode_preference_default() {
+        reset_storage().await;
+
+        // With no stored preference, should default to false (light mode)
+        let preference = get_dark_mode_preference();
+        assert_eq!(preference, false, "Default dark mode preference should be false");
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_get_dark_mode_preference_stored() {
+        reset_storage().await;
+
+        // Set a preference
+        let storage = get_storage().unwrap();
+        let _ = storage.set_item("dark_mode", "true");
+
+        // Should retrieve the stored preference
+        let preference = get_dark_mode_preference();
+        assert_eq!(preference, true, "Should retrieve stored dark mode preference");
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_save_dark_mode_preference() {
+        reset_storage().await;
+
+        // Test saving dark mode preference
+        let result = save_dark_mode_preference(true);
+        assert!(result.is_ok(), "Should successfully save dark mode preference");
+
+        // Verify it was stored correctly
+        let storage = get_storage().unwrap();
+        let stored_value = storage.get_item("dark_mode").unwrap();
+        assert_eq!(stored_value, Some("true".to_string()), 
+            "Dark mode preference should be stored correctly");
+
+        // Test saving light mode preference
+        let result = save_dark_mode_preference(false);
+        assert!(result.is_ok(), "Should successfully save light mode preference");
+
+        // Verify it was stored correctly
+        let stored_value = storage.get_item("dark_mode").unwrap();
+        assert_eq!(stored_value, Some("false".to_string()), 
+            "Light mode preference should be stored correctly");
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_logging() {
+        // Mount the test component
+        mount_to_body(|| view! { <LogTestComponent /> });
+        
+        // Get the log button
+        let log_button = get_by_test_id("log-button");
+        
+        // We can't directly assert on console logs, but we can verify the component works
+        click_and_wait(&log_button, 50).await;
+        
+        // If we reach here without errors, the test passes
+        // This is mostly to ensure the logging code doesn't throw exceptions
+        assert!(true);
+    }
+
+    // Test for error handling in localStorage
+    #[wasm_bindgen_test]
+    async fn test_storage_error_conversion() {
+        // Create a JS error
+        let js_error = JsValue::from_str("Test JS error");
+        
+        // Convert to our StorageError
+        let storage_error = StorageError::from(js_error);
+        
+        // Ensure error conversion worked
+        match storage_error {
+            StorageError::GetError(msg) => {
+                assert_eq!(msg, "Test JS error", "JS error should be converted to StorageError correctly");
+            },
+            _ => panic!("JS error should be converted to GetError variant")
+        }
+    }
+}
