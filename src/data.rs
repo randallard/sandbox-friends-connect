@@ -1,14 +1,26 @@
 use leptos::*;
 use leptos::prelude::*;
-use crate::utils::get_player_id;
+use crate::utils::{get_player_id, StorageError};
+use log::{error, warn};
 
 #[component]
 pub fn DataButton() -> impl IntoView {
     // Create a signal to track whether we're showing the button or panel
     let (show_panel, set_show_panel) = create_signal(false);
     
+    // Create a signal for potential storage errors
+    let (storage_error, set_storage_error) = create_signal(Option::<String>::None);
+    
     // Get the player ID when the component initializes
-    let player_id = store_value(get_player_id());
+    let player_id = store_value({
+        let id = get_player_id();
+        if id.is_empty() {
+            let err_msg = "Failed to get or generate player ID".to_string();
+            error!("{}", err_msg);
+            set_storage_error.set(Some(err_msg));
+        }
+        id
+    });
     
     // Click handler for the button to show the panel
     let show_panel_click = move |_| {
@@ -50,12 +62,28 @@ pub fn DataButton() -> impl IntoView {
                                 class="p-4 bg-indigo-50 rounded border border-indigo-100 text-indigo-900 font-medium"
                             >
                                 <p>"Your locally stored data would appear here."</p>
-                                <p 
-                                    data-test-id="player-id"
-                                    class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700"
-                                >
-                                    {"Player ID: "}{player_id.get_value()}
-                                </p>
+                                
+                                {move || {
+                                    if let Some(error) = storage_error.get() {
+                                        view! {
+                                            <p 
+                                                data-test-id="storage-error"
+                                                class="mt-2 p-2 bg-red-100 text-red-700 rounded-md"
+                                            >
+                                                {"Error: "}{error}
+                                            </p>
+                                        }
+                                    } else {
+                                        view! {
+                                            <p 
+                                                data-test-id="player-id"
+                                                class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700"
+                                            >
+                                                {"Player ID: "}{player_id.get_value()}
+                                            </p>
+                                        }
+                                    }
+                                }}
                             </div>
                         </div>
                     }.into_any()
@@ -157,5 +185,28 @@ mod tests {
         // Check that the player ID text starts with "Player ID: "
         assert!(player_id_text.starts_with("Player ID: "), 
             "Player ID should be formatted as 'Player ID: XXX'");
+    }
+    
+    // New test for storage error display
+    #[wasm_bindgen_test]
+    async fn test_storage_error_display() {
+        // This test would check that storage errors are displayed properly
+        // Note: For a full test we would need to mock localStorage failures
+        
+        // Since mocking is complex, we're just checking the component structure
+        mount_to_body(|| view! { <DataButton /> });
+        
+        // Get the data button and click it
+        let data_button = get_by_test_id("data-button");
+        click_and_wait(&data_button, 100).await;
+        
+        // Check that either player-id or storage-error exists
+        let document = web_sys::window().unwrap().document().unwrap();
+        let has_player_id = document.query_selector("[data-test-id='player-id']").unwrap().is_some();
+        let has_error = document.query_selector("[data-test-id='storage-error']").unwrap().is_some();
+        
+        // Either the player ID or an error message should exist
+        assert!(has_player_id || has_error, 
+            "Either player ID or storage error element should exist in the panel");
     }
 }

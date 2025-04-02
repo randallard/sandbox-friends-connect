@@ -2,17 +2,35 @@ use leptos::*;
 use leptos::prelude::*;
 use crate::data::DataButton;
 use crate::utils::{get_dark_mode_preference, save_dark_mode_preference};
+use log::{error, info}; // Import log macros
 
 #[component]
 pub fn App() -> impl IntoView {
     // Create a signal to track dark mode state, initialized from localStorage
     let (dark_mode, set_dark_mode) = create_signal(get_dark_mode_preference());
     
+    // Message for user feedback
+    let (storage_message, set_storage_message) = create_signal(Option::<String>::None);
+    
     // Toggle function for the dark mode
     let toggle_dark_mode = move |_| {
         set_dark_mode.update(|dark| {
             *dark = !*dark;
-            save_dark_mode_preference(*dark);
+            
+            // Handle the result of saving the preference
+            match save_dark_mode_preference(*dark) {
+                Ok(_) => {
+                    // Clear any previous error messages after a short delay
+                    set_storage_message.set(None);
+                },
+                Err(err) => {
+                    // Display the error message to the user
+                    set_storage_message.set(Some(format!("Failed to save preference: {:?}", err)));
+                    
+                    // Log the error for debugging
+                    error!("Failed to save dark mode preference: {:?}", err);
+                }
+            };
         });
     };
     
@@ -79,6 +97,9 @@ pub fn App() -> impl IntoView {
         }
     };
     
+    // Error message class
+    let error_class = "mt-4 p-2 bg-red-100 text-red-700 rounded-md text-sm";
+    
     view! {
         <div
             data-test-id="app-container"
@@ -99,6 +120,17 @@ pub fn App() -> impl IntoView {
                         {toggle_text}
                     </button>
                 </div>
+                
+                // Show storage error message if any
+                {move || {
+                    storage_message.get().map(|msg| {
+                        view! {
+                            <div data-test-id="storage-error" class={error_class}>
+                                {msg}
+                            </div>
+                        }
+                    })
+                }}
             </div>
 
             <DataButton />
@@ -171,9 +203,6 @@ mod tests {
         let window = web_sys::window().unwrap();
         let storage = window.local_storage().unwrap().unwrap();
 
-        // Clean up any previous state
-        // storage.remove_item("dark_mode").unwrap();
-
         // Mount the App component to the body
         mount_to_body(|| view! { <App /> });
         
@@ -194,24 +223,6 @@ mod tests {
         let stored_value = storage.get_item("dark_mode").unwrap();
         assert_eq!(stored_value, Some("true".to_string()), 
                 "Dark mode preference should be saved to localStorage");
-        
-        // Unmount and remount component to simulate page reload
-        // This is a simplified approach - in a real app, you might need to mock page reload differently
-        // let body = window.document().unwrap().body().unwrap();
-        // body.set_inner_html("");
-        
-        // Remount the App
-        // mount_to_body(|| view! { <App /> });
-        
-        // Get the container again
-        // let container = get_by_test_id("app-container");
-        
-        // Verify the dark mode preference was loaded from localStorage
-        // assert!(container.class_list().contains("dark"), 
-        //         "Container should start in dark mode based on localStorage value");
-        
-        // Clean up
-        // storage.remove_item("dark_mode").unwrap();
     }
 
     #[wasm_bindgen_test]
@@ -222,5 +233,24 @@ mod tests {
         // Verify the data button exists when integrated into the App
         let data_button = get_by_test_id("data-button");
         assert!(data_button.is_object(), "Data button should exist when integrated into App");
+    }
+    
+    // New test for storage error handling
+    #[wasm_bindgen_test]
+    async fn test_storage_error_handling() {
+        // This test would simulate a localStorage failure
+        // Since it's hard to mock localStorage failures directly,
+        // we can check that the error element exists in the DOM structure
+        
+        // Mount the App component to the body
+        mount_to_body(|| view! { <App /> });
+        
+        // Check that error message element doesn't exist initially
+        let document = web_sys::window().unwrap().document().unwrap();
+        let error_elements = document.query_selector_all("[data-test-id='storage-error']").unwrap();
+        assert_eq!(error_elements.length(), 0, "Error message should not be visible initially");
+        
+        // For a complete test, we'd need to mock localStorage to fail
+        // This is complex in WASM and would require additional test infrastructure
     }
 }

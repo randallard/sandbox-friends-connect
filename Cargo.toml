@@ -1,37 +1,32 @@
 [package]
-name = "sandbox-friends-connect"
+name = "leptos-csr-app"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76"  # Latest required by Leptos 0.7
-
-# Set up optimized WASM builds
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 'z'  # Optimize for size
-
-# Additional WASM-specific optimizations
-[profile.wasm-release]
-inherits = "release"
-opt-level = 'z'
-lto = true
-codegen-units = 1
 
 [dependencies]
-leptos = { version = "0.7", features = ["csr"] }
-uuid = { version = "1.7.0", features = ["v4", "js"] }  
-web-sys = { version = "0.3.70", features = [
-    "Document", 
-    "Element", 
-    "HtmlElement", 
-    "Node", 
-    "Storage", 
-    "Location"
+leptos = { version = "0.7.8", features = ["csr"] }
+leptos_meta = { version = "0.7.8" }  # No features needed
+leptos_router = { version = "0.7.8" } # No features needed for 0.7.8
+log = "0.4"
+wasm-logger = "0.2"
+uuid = { version = "1.6", features = ["v4", "js"] }
+web-sys = { version = "0.3", features = [
+    "Storage",
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "CssStyleDeclaration",
+    "console",
+    "NodeList",
 ]}
-wasm-bindgen = "0.2.93"  
-js-sys = "0.3.69"  
-console_error_panic_hook = "0.1.7"  
+wasm-bindgen = "0.2"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
-gloo-timers = {version = "0.3.0", features=["futures"]}
+gloo-timers = { version = "0.3", features = ["futures"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 'z'
