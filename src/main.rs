@@ -1,6 +1,7 @@
 // src/main.rs
 mod app;
 mod test_utils;
+mod data;
 
 use leptos::*;
 use leptos::prelude::*;

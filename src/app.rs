@@ -1,6 +1,7 @@
 use leptos::*;
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;
+use crate::data::DataButton;
 
 #[wasm_bindgen]
 extern "C" {
@@ -121,6 +122,8 @@ pub fn App() -> impl IntoView {
                     </button>
                 </div>
             </div>
+
+            <DataButton />
         </div>
     }
 }
@@ -231,5 +234,15 @@ mod tests {
         
         // Clean up
         // storage.remove_item("dark_mode").unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_data_button_integration() {
+        // Mount the App component to the body
+        mount_to_body(|| view! { <App /> });
+        
+        // Verify the data button exists when integrated into the App
+        let data_button = get_by_test_id("data-button");
+        assert!(data_button.is_object(), "Data button should exist when integrated into App");
     }
 }
