@@ -16,10 +16,10 @@ wasm_bindgen_test_configure!(run_in_browser);
 #[component]
 fn AppWithMockLogger() -> impl IntoView {
     // Initialize our mock logger
-    let collector = store_value(init_log_collector());
+    let collector = init_log_collector();
     
     // Clear any existing logs
-    collector.get_value().clear();
+    collector.clear();
     
     view! {
         <div>

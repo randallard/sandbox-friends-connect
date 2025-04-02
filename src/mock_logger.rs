@@ -95,24 +95,29 @@ pub mod mock {
     // Component that logs messages when certain actions occur
     #[component]
     pub fn LogTestApp() -> impl IntoView {
-        let collector = store_value(init_log_collector());
+        // Use a signal instead of store_value for reactivity and to avoid thread safety issues
+        let collector = init_log_collector();
+        let collector_clone1 = collector.clone();
+        let collector_clone2 = collector.clone();
+        let collector_clone3 = collector.clone();
+        let collector_clone4 = collector.clone();
         
         let log_info = move |_| {
-            collector.get_value().record_info("Test info message");
+            collector_clone1.record_info("Test info message");
         };
         
         let log_warn = move |_| {
-            collector.get_value().record_warn("Test warning message");
+            collector_clone2.record_warn("Test warning message");
         };
         
         let log_error = move |_| {
-            collector.get_value().record_error("Test error message");
+            collector_clone3.record_error("Test error message");
         };
         
         let log_all = move |_| {
-            collector.get_value().record_info("All levels info");
-            collector.get_value().record_warn("All levels warning");
-            collector.get_value().record_error("All levels error");
+            collector_clone4.record_info("All levels info");
+            collector_clone4.record_warn("All levels warning");
+            collector_clone4.record_error("All levels error");
         };
         
         view! {
