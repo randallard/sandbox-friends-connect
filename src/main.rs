@@ -2,6 +2,7 @@
 mod app;
 mod test_utils;
 mod data;
+mod utils; // Add the new utils module
 
 use leptos::*;
 use leptos::prelude::*;

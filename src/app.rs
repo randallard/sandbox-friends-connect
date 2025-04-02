@@ -1,32 +1,10 @@
 use leptos::*;
 use leptos::prelude::*;
-use wasm_bindgen::prelude::*;
 use crate::data::DataButton;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = window)]
-    fn localStorage() -> JsValue;
-
-    #[wasm_bindgen(js_namespace = ["localStorage"], js_name = getItem)]
-    fn get_item(key: &str) -> JsValue;
-
-    #[wasm_bindgen(js_namespace = ["localStorage"], js_name = setItem)]
-    fn set_item(key: &str, value: &str);
-}
+use crate::utils::{get_dark_mode_preference, save_dark_mode_preference};
 
 #[component]
 pub fn App() -> impl IntoView {
-    // Helper functions for localStorage
-    fn get_dark_mode_preference() -> bool {
-        let stored = get_item("dark_mode");
-        !stored.is_null() && stored.as_string().unwrap_or_default() == "true"
-    }
-
-    fn save_dark_mode_preference(is_dark: bool) {
-        set_item("dark_mode", if is_dark { "true" } else { "false" });
-    }
-
     // Create a signal to track dark mode state, initialized from localStorage
     let (dark_mode, set_dark_mode) = create_signal(get_dark_mode_preference());
     
@@ -132,7 +110,7 @@ pub fn App() -> impl IntoView {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
-    use web_sys::{Document, Storage, wasm_bindgen::JsCast, window};
+    use web_sys::{Document, wasm_bindgen::JsCast, window};
     use crate::test_utils::test::*;
 
     wasm_bindgen_test_configure!(run_in_browser);

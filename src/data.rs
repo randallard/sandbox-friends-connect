@@ -1,99 +1,11 @@
 use leptos::*;
 use leptos::prelude::*;
-use wasm_bindgen::prelude::*;
-use web_sys::{self, Window, js_sys};
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = ["localStorage"], js_name = getItem)]
-    fn get_item(key: &str) -> JsValue;
-
-    #[wasm_bindgen(js_namespace = ["localStorage"], js_name = setItem)]
-    fn set_item(key: &str, value: &str);
-}
-
-// Helper function to generate a GUID for player ID
-fn generate_player_id() -> String {
-    // Implementation of UUID v4 (random) generation
-    let window = web_sys::window().expect("Failed to get window");
-    
-    // Try to use the Web Crypto API if available
-    if let Some(crypto) = window.crypto() {
-        // Generate random bytes for UUID v4
-        let mut buffer = [0u8; 16];
-        if crypto.get_random_values_with_u8_array(&mut buffer).is_ok() {
-            // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-            // Set version (4) and variant bits
-            buffer[6] = (buffer[6] & 0x0f) | 0x40; // Version 4
-            buffer[8] = (buffer[8] & 0x3f) | 0x80; // Variant 1
-            
-            // Format the UUID
-            format!(
-                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-                buffer[0], buffer[1], buffer[2], buffer[3],
-                buffer[4], buffer[5],
-                buffer[6], buffer[7],
-                buffer[8], buffer[9],
-                buffer[10], buffer[11], buffer[12], buffer[13], buffer[14], buffer[15]
-            )
-        } else {
-            // Fallback to a simpler approach
-            fallback_uuid_generation(&window)
-        }
-    } else {
-        // Web Crypto API not available, use fallback
-        fallback_uuid_generation(&window)
-    }
-}
-
-// Fallback UUID generation when Web Crypto API is not available
-fn fallback_uuid_generation(window: &Window) -> String {
-    // Template for UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    let template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
-    let hex_chars = [
-        '0', '1', '2', '3', '4', '5', '6', '7',
-        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
-    ];
-    
-    let mut result = String::with_capacity(36);
-    for c in template.chars() {
-        match c {
-            'x' => {
-                // Generate random hex digit
-                let random = js_sys::Math::random() * 16.0;
-                let index = random as usize;
-                result.push(hex_chars[index]);
-            },
-            'y' => {
-                // For the y position, use 8, 9, a, or b (variant 1)
-                let random = js_sys::Math::random() * 4.0;
-                let index = 8 + random as usize;
-                result.push(hex_chars[index]);
-            },
-            _ => result.push(c),
-        }
-    }
-    
-    result
-}
-
-// Helper function to get player ID from localStorage
-fn get_player_id() -> String {
-    let stored = get_item("player_id");
-    if !stored.is_null() {
-        stored.as_string().unwrap_or_default()
-    } else {
-        // Generate a new player ID and store it
-        let new_id = generate_player_id();
-        set_item("player_id", &new_id);
-        new_id
-    }
-}
+use crate::utils::get_player_id;
 
 #[component]
 pub fn DataButton() -> impl IntoView {
     // Create a signal to track whether we're showing the button or panel
-    let (show_panel, set_show_panel) = signal(false);
+    let (show_panel, set_show_panel) = create_signal(false);
     
     // Get the player ID when the component initializes
     let player_id = store_value(get_player_id());
