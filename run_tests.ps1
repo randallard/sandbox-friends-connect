@@ -121,6 +121,24 @@ function Run-Command {
     }
 }
 
+# Helper function to check if a port is in use
+function Test-PortInUse {
+    param (
+        [int]$port
+    )
+    
+    $connection = New-Object System.Net.Sockets.TcpClient
+    
+    try {
+        $connection.Connect("localhost", $port)
+        $connection.Close()
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
 # Set up logging
 $logFile = "test_run_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 Write-Host "Logging all output to $logFile" -ForegroundColor Cyan
@@ -152,9 +170,21 @@ Add-Content -Path $logFile -Value $headerText
 if (Test-Path -Path "Trunk.toml") {
     Log-Output "FOUND: Custom Trunk.toml configuration" "Green"
     Add-Content -Path $logFile -Value (Get-Content -Path "Trunk.toml" -Raw)
+    
+    # Extract port from Trunk.toml if it exists
+    $trunkConfig = Get-Content -Path "Trunk.toml" -Raw
+    if ($trunkConfig -match '(?m)^\s*port\s*=\s*(\d+)') {
+        $trunkPort = [int]$matches[1]
+        Log-Output "INFO: Found port $trunkPort in Trunk.toml" "Cyan"
+    } else {
+        $trunkPort = 8080 # Default Trunk port
+        Log-Output "INFO: Using default Trunk port 8080" "Cyan"
+    }
 } 
 else {
     Log-Output "INFO: No Trunk.toml found, using default settings" "Yellow"
+    $trunkPort = 8080 # Default Trunk port
+    Log-Output "INFO: Using default Trunk port 8080" "Cyan"
 }
 
 # Check Tailwind configuration
@@ -216,10 +246,21 @@ Run-Command -command "cargo test" -description "Running Rust unit tests" -isTest
 Run-Command -command "wasm-pack test --firefox --headless" -description "Running WebAssembly tests" -isTest
 
 Log-Output "SUCCESS: All tests passed successfully! 🎉" "Green"
-Log-Output "PROGRESS: Starting Trunk development server..." "Cyan"
 
-# Add final timestamp to log
-Add-Content -Path $logFile -Value "`n======================================================`nStarting Trunk server: $(Get-Date)`n======================================================"
-
-# Start the trunk server
-trunk serve
+# Check if port is already in use
+if (Test-PortInUse -port $trunkPort) {
+    Log-Output "WARNING: Port $trunkPort is already in use!" "Yellow"
+    Log-Output "INFO: Trunk server will not be started to avoid conflicts." "Yellow"
+    Log-Output "INFO: Please check for other instances of Trunk or services using port $trunkPort" "Yellow"
+    
+    # Add final timestamp to log
+    Add-Content -Path $logFile -Value "`n======================================================`nPort $trunkPort already in use - Trunk server not started: $(Get-Date)`n======================================================"
+} else {
+    Log-Output "PROGRESS: Starting Trunk development server on port $trunkPort..." "Cyan"
+    
+    # Add final timestamp to log
+    Add-Content -Path $logFile -Value "`n======================================================`nStarting Trunk server: $(Get-Date)`n======================================================"
+    
+    # Start the trunk server
+    trunk serve
+}

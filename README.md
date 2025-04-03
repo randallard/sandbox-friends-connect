@@ -2,22 +2,37 @@
 
 A playground for developing and testing client functionality for the [friends-connect](https://github.com/randallard/friends-connect) API.
 
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/friends-connect-sandbox.git
+cd friends-connect-sandbox
+
+# Run tests and start development server
+# For Windows:
+.\run_tests.ps1
+
+# For Linux/macOS:
+chmod +x run_tests.sh
+./run_tests.sh
+```
+
+The test scripts will:
+- Validate your Tailwind CSS configuration
+- Run Rust unit tests
+- Run WebAssembly tests
+- Start a Trunk development server if all tests pass
+
+For a detailed explanation of what these test scripts do, check the [test scripts documentation](https://github.com/yourusername/friends-connect-sandbox/docs/test-scripts.md).
+
 ## Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) and Cargo
 - [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) for WebAssembly compilation
 - [Trunk](https://trunkrs.dev/#install) for bundling and serving
 
-## Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/yourusername/friends-connect-sandbox.git
-cd friends-connect-sandbox
-```
-
-### 2. Project Structure
+## Project Structure
 
 Ensure your project structure looks like this:
 ```
@@ -32,6 +47,8 @@ project_root/
 ├── tailwind.config.js
 ├── postcss.config.js
 ├── Trunk.toml
+├── run_tests.ps1     # Windows test script
+├── run_tests.sh      # Linux/macOS test script
 ├── Cargo.toml
 └── ...
 ```
@@ -41,7 +58,7 @@ If the `dist` directory doesn't exist, create it:
 mkdir -p dist
 ```
 
-### 3. Tailwind CSS Setup
+## Tailwind CSS Setup
 
 This project uses Tailwind CSS for styling. Make sure your configuration is correct:
 
@@ -82,24 +99,9 @@ command = "npx"
 command_arguments = ["tailwindcss", "-i", "input.css", "-o", "dist/tailwind.css"]
 ```
 
-### 4. Running Tests
+## Running Tests Manually
 
-You can run tests using the provided scripts or manually:
-
-#### Using the test scripts:
-
-**Windows:**
-```
-.\run_tests.ps1
-```
-
-**Linux/macOS:**
-```
-chmod +x run_tests.sh
-./run_tests.sh
-```
-
-#### Running tests manually:
+If you prefer not to use the provided scripts, you can run tests manually:
 
 **Standard Rust tests:**
 ```bash
@@ -112,9 +114,9 @@ cargo test
 wasm-pack test --firefox --headless
 ```
 
-### 5. Running the Development Server
+## Running the Development Server
 
-To start the development server:
+To start the development server manually:
 
 ```bash
 trunk serve
@@ -122,7 +124,7 @@ trunk serve
 
 The application will be available at `http://localhost:8080` by default.
 
-### 5. Development environment
+## Development environment
 
 This project uses:
 - [Leptos](https://leptos.dev/) for reactive web UI

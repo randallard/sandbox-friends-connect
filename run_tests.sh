@@ -1,164 +1,242 @@
 #!/bin/bash
 
-# Set up logging
-LOG_FILE="test_run_$(date +"%Y%m%d_%H%M%S").log"
-echo "Logging all output to $LOG_FILE"
+# Leptos 0.7 CSR Test Runner
+# This script automates testing and deployment for Leptos 0.7 CSR applications
+# It runs Rust and WebAssembly tests, verifies Tailwind CSS configuration,
+# and starts a Trunk development server if all tests pass.
 
-# Helper function to log output
+# Set up variables
+timestamp=$(date +"%Y%m%d_%H%M%S")
+log_file="test_run_${timestamp}.log"
+default_port=8080
+trunk_port=$default_port
+
+# ANSI color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Create log file with header
+echo "=== Leptos 0.7 CSR Test Run - $(date) ===" > "$log_file"
+echo "" >> "$log_file"
+
+# Function to log output to both console and log file
 log_output() {
-    local message="$1"
-    local level="${2:-INFO}"
-    local color=""
+    local level=$1
+    local message=$2
+    local color=$NC
     
-    # Set color based on level
     case "$level" in
-        SUCCESS) color="\033[0;32m" ;;  # Green
-        ERROR)   color="\033[0;31m" ;;  # Red
-        WARNING) color="\033[0;33m" ;;  # Yellow
-        PROGRESS) color="\033[0;36m" ;;  # Cyan
-        INFO|*)  color="\033[0m" ;;      # Default
+        "INFO") color=$BLUE ;;
+        "SUCCESS") color=$GREEN ;;
+        "WARNING") color=$YELLOW ;;
+        "ERROR") color=$RED ;;
     esac
     
-    # Write to console with minimal info
-    echo -e "${color}${level}: ${message}\033[0m"
+    # Output to console with color
+    echo -e "${color}[$level] $message${NC}"
     
-    # Write to log file with timestamp
-    echo "[$(date +"%Y-%m-%d %H:%M:%S")] [${level}] ${message}" >> "$LOG_FILE"
+    # Output to log file without color codes
+    echo "[$level] $message" >> "$log_file"
 }
 
-# Helper function to run commands with logging
+# Function to run a command with proper logging
 run_command() {
-    local command="$1"
-    local description="$2"
-    local continue_on_error="${3:-false}"
-    local is_test="${4:-false}"
+    local command_name=$1
+    local command=$2
+    local continue_on_error=${3:-false}
     
-    log_output "$description" "PROGRESS"
+    log_output "INFO" "Running $command_name..."
+    echo "Command: $command" >> "$log_file"
+    echo "----------------------------------------" >> "$log_file"
     
-    # Log the command
-    echo -e "\n>>> EXECUTING: $command\n" >> "$LOG_FILE"
+    # Run the command and capture output
+    output=$(eval "$command" 2>&1)
+    exit_code=$?
     
-    # Create a temporary file to capture output
-    local temp_file=$(mktemp)
+    # Log the output
+    echo "$output" >> "$log_file"
+    echo "----------------------------------------" >> "$log_file"
+    echo "Exit code: $exit_code" >> "$log_file"
+    echo "" >> "$log_file"
     
-    # Run command and capture output to both log file and temp file
-    if ! eval "$command" | tee -a "$LOG_FILE" "$temp_file" >/dev/null 2>&1; then
-        # Command failed
-        if [ "$is_test" = "true" ]; then
-            # Extract failing test names based on the command type
-            if [[ "$command" == *"cargo test"* ]]; then
-                # Process cargo test output
-                log_output "The following tests failed:" "ERROR"
-                grep "test .* ... FAILED" "$temp_file" | sed -E 's/test (.*) ... FAILED/  - \1/' | while read -r line; do
-                    log_output "$line" "ERROR"
-                done
-            elif [[ "$command" == *"wasm-pack test"* ]]; then
-                # Process wasm-pack test output
-                log_output "The following tests failed:" "ERROR"
-                grep "FAIL.*" "$temp_file" | sed -E 's/FAIL.*?://g' | sed -E 's/\[.*?\]//g' | sed -E 's/^[ \t]+//g' | while read -r line; do
-                    log_output "  - $line" "ERROR"
-                done
-            fi
-        fi
-        
-        # Clean up temp file
-        rm -f "$temp_file"
-        
-        if [ "$continue_on_error" = "true" ]; then
-            log_output "$description completed with non-zero exit code" "WARNING"
-            return 1
+    # Process and display the output based on the command type
+    if [[ "$command" == *"cargo test"* ]] || [[ "$command" == *"wasm-pack test"* ]]; then
+        # Extract and display test results
+        if echo "$output" | grep -q "test result: FAILED"; then
+            # Find and display failing tests
+            echo "$output" | grep -E "^test .+ ... FAILED" | while read -r line; do
+                log_output "ERROR" "$line"
+            done
+            
+            # Display test summary
+            summary=$(echo "$output" | grep -E "test result: FAILED. [0-9]+ passed; [0-9]+ failed")
+            log_output "ERROR" "$summary"
+        elif echo "$output" | grep -q "test result: ok"; then
+            # Display test summary for successful tests
+            summary=$(echo "$output" | grep -E "test result: ok. [0-9]+ passed; [0-9]+ failed")
+            log_output "SUCCESS" "$summary"
         else
-            log_output "$description failed" "ERROR"
-            log_output "See $LOG_FILE for details" "INFO"
-            exit 1
+            # For other outputs, show a few lines
+            echo "$output" | tail -n 10 | while read -r line; do
+                echo "$line"
+            done
         fi
     else
-        # Clean up temp file
-        rm -f "$temp_file"
+        # For other commands, show the last few lines of output
+        echo "$output" | tail -n 5 | while read -r line; do
+            echo "$line"
+        done
+    fi
+    
+    # Check if we should continue on error
+    if [ $exit_code -ne 0 ] && [ "$continue_on_error" = false ]; then
+        log_output "ERROR" "$command_name failed with exit code $exit_code"
+        log_output "INFO" "Check the log file for details: $log_file"
+        exit $exit_code
+    elif [ $exit_code -ne 0 ]; then
+        log_output "WARNING" "$command_name completed with exit code $exit_code"
+    else
+        log_output "SUCCESS" "$command_name completed successfully"
+    fi
+    
+    return $exit_code
+}
+
+# Function to check if a port is in use - cross-platform approach
+test_port_in_use() {
+    local port=$1
+    
+    # Try to create a TCP socket on the port
+    # If it fails, the port is already in use
+    if command -v nc &> /dev/null; then
+        # Using netcat if available
+        nc -z localhost "$port" >/dev/null 2>&1
+        return $?
+    elif command -v python3 &> /dev/null || command -v python &> /dev/null; then
+        # Using Python as a fallback
+        python_cmd="python"
+        if command -v python3 &> /dev/null; then
+            python_cmd="python3"
+        fi
         
-        log_output "$description completed" "SUCCESS"
+        $python_cmd -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind(('127.0.0.1', $port))
+    s.close()
+    exit(1)  # Port is free
+except socket.error:
+    exit(0)  # Port is in use
+" >/dev/null 2>&1
+        return $?
+    else
+        # Last resort - try to use /dev/tcp on bash (might not work on all systems)
+        (echo > /dev/tcp/localhost/$port) >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            return 0  # Port is in use
+        else
+            return 1  # Port is free
+        fi
+    fi
+}
+
+# Function to detect trunk.toml configuration
+detect_trunk_config() {
+    log_output "INFO" "Checking for Trunk.toml configuration..."
+    
+    if [ -f "Trunk.toml" ]; then
+        log_output "INFO" "Trunk.toml found, checking for port configuration..."
+        
+        # Try to extract port setting
+        if grep -q "port" "Trunk.toml"; then
+            trunk_port=$(grep -oP 'port\s*=\s*\K\d+' "Trunk.toml")
+            log_output "INFO" "Custom port configured in Trunk.toml: $trunk_port"
+        else
+            log_output "INFO" "No custom port found in Trunk.toml, using default port: $default_port"
+        fi
+    else
+        log_output "INFO" "No Trunk.toml found, using default port: $default_port"
+    fi
+}
+
+# Function to detect Tailwind CSS configuration
+detect_tailwind_config() {
+    log_output "INFO" "Checking for Tailwind CSS configuration..."
+    
+    # Check for Tailwind CDN usage in index.html
+    if [ -f "index.html" ] && grep -q "tailwindcss" "index.html"; then
+        log_output "INFO" "Detected Tailwind CSS via CDN in index.html"
         return 0
     fi
+    
+    # Check for local Tailwind configuration
+    if [ -f "tailwind.config.js" ]; then
+        log_output "INFO" "Found tailwind.config.js"
+        
+        # Check for input.css
+        if [ -f "input.css" ] || [ -f "src/input.css" ] || [ -f "styles/input.css" ]; then
+            log_output "INFO" "Found Tailwind CSS input file"
+            
+            # Check for postcss.config.js (optional)
+            if [ -f "postcss.config.js" ]; then
+                log_output "INFO" "Found postcss.config.js"
+            else
+                log_output "INFO" "No postcss.config.js found (optional)"
+            fi
+            
+            # Test Tailwind CSS compilation
+            log_output "INFO" "Testing Tailwind CSS compilation..."
+            if command -v npx &> /dev/null; then
+                run_command "Tailwind CSS compilation test" "npx tailwindcss -i input.css -o /dev/null" true
+            else
+                log_output "WARNING" "npx not found, skipping Tailwind CSS compilation test"
+            fi
+            
+            return 0
+        else
+            log_output "WARNING" "tailwind.config.js found but no input.css file detected"
+            return 1
+        fi
+    fi
+    
+    log_output "INFO" "No Tailwind CSS configuration detected"
+    return 0
 }
 
-# Initialize log file with header
-cat > "$LOG_FILE" << EOF
-======================================================
-Leptos 0.7 CSR Test Runner
-Started: $(date)
-======================================================
-EOF
+# Main script execution
 
-# Check for Trunk.toml
-if [ -f "Trunk.toml" ]; then
-    log_output "Custom Trunk.toml configuration found" "SUCCESS"
-    echo -e "\n>>> CONTENT OF Trunk.toml:\n" >> "$LOG_FILE"
-    cat "Trunk.toml" >> "$LOG_FILE"
+log_output "INFO" "Starting Leptos 0.7 CSR test runner..."
+
+# Detect Trunk configuration
+detect_trunk_config
+
+# Detect Tailwind CSS configuration
+detect_tailwind_config
+
+# Run Rust unit tests
+run_command "Rust unit tests" "cargo test"
+
+# Run WebAssembly tests
+run_command "WebAssembly tests" "wasm-pack test --firefox --headless"
+
+# Check if port is available before starting Trunk server
+log_output "INFO" "Checking if port $trunk_port is available..."
+if test_port_in_use "$trunk_port"; then
+    log_output "WARNING" "Port $trunk_port is already in use. Please close the application using this port or configure a different port in Trunk.toml"
 else
-    log_output "No Trunk.toml found, using default settings" "INFO"
+    log_output "SUCCESS" "Port $trunk_port is available"
+    log_output "INFO" "Starting Trunk server on port $trunk_port..."
+    
+    # Add a trap to handle CTRL+C more gracefully
+    trap 'log_output "INFO" "Stopping Trunk server..."; echo ""; exit 0' INT
+    
+    # Run trunk server in foreground
+    log_output "INFO" "Running 'trunk serve --open' (Press CTRL+C to stop)"
+    trunk serve --open
 fi
 
-# Check Tailwind configuration
-USING_CDN=false
-if [ -f "index.html" ]; then
-    if grep -q "cdn\.tailwindcss\.com" "index.html"; then
-        log_output "Tailwind CSS via CDN detected" "SUCCESS"
-        USING_CDN=true
-    fi
-fi
-
-if [ "$USING_CDN" = false ]; then
-    # Check for Tailwind files
-    CONFIG_OK=true
-    
-    # Required files
-    for file in "tailwind.config.js" "input.css"; do
-        if [ -f "$file" ]; then
-            log_output "$file found" "SUCCESS"
-            echo -e "\n>>> CONTENT OF $file:\n" >> "$LOG_FILE"
-            cat "$file" >> "$LOG_FILE"
-        else
-            log_output "Required file $file is missing" "ERROR"
-            CONFIG_OK=false
-        fi
-    done
-    
-    # Optional files
-    if [ -f "postcss.config.js" ]; then
-        log_output "postcss.config.js found" "SUCCESS"
-        echo -e "\n>>> CONTENT OF postcss.config.js:\n" >> "$LOG_FILE"
-        cat "postcss.config.js" >> "$LOG_FILE"
-    else
-        log_output "Optional file postcss.config.js is missing" "WARNING"
-    fi
-    
-    if [ "$CONFIG_OK" = false ]; then
-        log_output "Critical Tailwind CSS files are missing" "ERROR"
-        exit 1
-    fi
-    
-    # Test Tailwind CSS compilation
-    run_command "npx tailwindcss -i input.css -o temp-output.css" "Testing Tailwind CSS compilation"
-    
-    if [ -f "temp-output.css" ]; then
-        rm temp-output.css
-    else
-        log_output "Tailwind CSS compilation failed to produce output file" "ERROR"
-        exit 1
-    fi
-fi
-
-# Run standard Rust tests
-run_command "cargo test" "Running Rust unit tests" "false" "true"
-
-# Run wasm tests
-run_command "wasm-pack test --firefox --headless" "Running WebAssembly tests" "false" "true"
-
-log_output "All tests passed successfully! 🎉" "SUCCESS"
-log_output "Starting Trunk development server..." "PROGRESS"
-
-# Add final timestamp to log
-echo -e "\n======================================================\nStarting Trunk server: $(date)\n======================================================" >> "$LOG_FILE"
-
-# Start the trunk server
-trunk serve
+log_output "SUCCESS" "Test run completed. See $log_file for complete details."
