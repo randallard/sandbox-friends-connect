@@ -71,7 +71,7 @@ Write-Host "Cargo tests passed!" -ForegroundColor Green
 
 # If cargo tests pass, run wasm tests
 Write-Host "Running wasm tests..." -ForegroundColor Cyan
-wasm-pack test --chrome --headless
+wasm-pack test --firefox --headless
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Wasm tests failed!" -ForegroundColor Red
     exit 1

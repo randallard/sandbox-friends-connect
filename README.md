@@ -108,12 +108,6 @@ cargo test
 
 **WebAssembly tests:**
 ```bash
-# Run in Chrome (headless)
-wasm-pack test --chrome --headless
-
-# Run in Chrome (with browser UI)
-wasm-pack test --chrome
-
 # Run in Firefox (headless)
 wasm-pack test --firefox --headless
 ```

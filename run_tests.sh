@@ -66,7 +66,7 @@ echo -e "\033[0;32m✅ Cargo tests passed!\033[0m"
 
 # If cargo tests pass, run wasm tests
 echo -e "\033[0;36mRunning wasm tests...\033[0m"
-if ! wasm-pack test --chrome --headless; then
+if ! wasm-pack test --firefox --headless; then
     echo -e "\033[0;31m❌ Wasm tests failed!\033[0m"
     exit 1
 fi
