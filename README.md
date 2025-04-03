@@ -1,174 +1,57 @@
-# Sandbox for Friends-Connect
+last try at fixing this issue
 
-A playground for developing and testing client functionality for the [friends-connect](https://github.com/randallard/friends-connect) API.
+## Our Progress on Fixing the 404 Error in WASM Tests
 
-## Prerequisites
+We've been working on resolving the error `Error: http://127.0.0.1:xxxxx/session/[id]/url: status code 404` that occurs when running WASM tests with wasm-pack. This error happens because wasm-bindgen-test tries to access a URL that doesn't exist during test execution.
 
-- [Rust](https://www.rust-lang.org/tools/install) and Cargo
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) for WebAssembly compilation
-- [Trunk](https://trunkrs.dev/#install) for bundling and serving
+### Approaches We've Tried:
 
-## Getting Started
+1. **Storage Mocking**: 
+   - Created a mock localStorage implementation to prevent real localStorage operations
+   - Implemented functions like `mock_local_storage_get`, `mock_local_storage_set`, and `mock_local_storage_clear`
+   - This avoided blocking operations but didn't resolve the 404 error
 
-### 1. Clone the repository
+2. **Test Setup Module**:
+   - Created a `test_setup.rs` module with initialization functions
+   - Added `wait_for_dom_update()` to handle asynchronous operations safely
+   - Implemented better error handling for DOM operations
 
-```bash
-git clone https://github.com/yourusername/friends-connect-sandbox.git
-cd friends-connect-sandbox
-```
+3. **Improved Test Utils**:
+   - Enhanced the `get_by_test_id()` function with better error reporting
+   - Created safer event handling in `click_and_wait()`
+   - Added helper functions for waiting for elements to appear
 
-### 2. Project Structure
+4. **Direct JavaScript URL Interception**:
+   - Created a `direct_patch.js` file to intercept problematic URL requests
+   - Used a custom test harness HTML file (`test-harness.html`)
+   - Added fetch and XMLHttpRequest interception for URLs containing `/session/` and `/url`
 
-Ensure your project structure looks like this:
-```
-project_root/
-├── src/
-│   ├── main.rs
-│   ├── app.rs
-│   └── test_utils.rs
-├── dist/             # Directory for compiled assets
-├── index.html
-├── input.css
-├── tailwind.config.js
-├── postcss.config.js
-├── Trunk.toml
-├── Cargo.toml
-└── ...
-```
+5. **Rust-based XHR Patching**:
+   - Added a `mock_xhr.rs` module that applies JavaScript patches from Rust
+   - Used the `wasm_bindgen(start)` attribute to apply patches early
+   - Created test methods to verify the patch works
 
-If the `dist` directory doesn't exist, create it:
-```bash
-mkdir -p dist
-```
+6. **Run Script Approach**:
+   - Created a `run-test.sh` script that sets up the environment and runs tests
+   - Used environment variables to inject the patch before tests run
+   - Targeted specific tests to verify the patch works
 
-### 3. Tailwind CSS Setup
+7. **Cargo.toml Configuration**:
+   - Added `[package.metadata.wasm-pack]` section to specify custom test HTML
+   - Updated dependencies to include `wasm-bindgen-futures = "0.4.50"` and other required crates
+   - Added appropriate web-sys features for browser interactions
 
-This project uses Tailwind CSS for styling. Make sure your configuration is correct:
+### Current Status:
 
-1. **Update index.html**: Use the compiled CSS file instead of CDN
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sandbox Friends Connect</title>
-    <!-- Remove or comment out the CDN script if present -->
-    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
-    
-    <!-- Add this link instead -->
-    <link data-trunk rel="css" href="dist/tailwind.css" />
-  </head>
-  <body>
-    <link data-trunk rel="rust" data-wasm-opt="z" />
-  </body>
-</html>
-```
+The issue appears to be persistent despite our attempts to intercept the problematic URL requests. The most promising approach seems to be the direct JavaScript patch combined with specifying a custom test harness in Cargo.toml, but we haven't yet confirmed that it resolves the issue completely.
 
-2. **Update Trunk.toml**: Make the Tailwind compilation cross-platform
-```toml
-[serve]
-address = "127.0.0.1"
-port = 8080
-open = true
+### Next Steps:
 
-[watch]
-watch = ["src", "input.css", "index.html", "tailwind.config.js"]
+1. Verify if the most direct approach (using the run script) works
+2. If none of our approaches work, we may need to:
+   - Consider running tests in a different browser
+   - Explore using a different test runner
+   - Look into updating dependencies or changing the overall test architecture
+   - Check if there's a known issue or workaround in newer versions of wasm-pack or wasm-bindgen-test
 
-[[hooks]]
-stage = "pre_build"
-# Cross-platform approach
-command = "npx"
-command_arguments = ["tailwindcss", "-i", "input.css", "-o", "dist/tailwind.css"]
-```
-
-### 4. Running Tests
-
-You can run tests using the provided scripts or manually:
-
-#### Using the test scripts:
-
-**Windows:**
-```
-.\run_tests.ps1
-```
-
-**Linux/macOS:**
-```
-chmod +x run_tests.sh
-./run_tests.sh
-```
-
-#### Running tests manually:
-
-**Standard Rust tests:**
-```bash
-cargo test
-```
-
-**WebAssembly tests:**
-```bash
-# Run in Chrome (headless)
-wasm-pack test --chrome --headless
-
-# Run in Chrome (with browser UI)
-wasm-pack test --chrome
-
-# Run in Firefox (headless)
-wasm-pack test --firefox --headless
-```
-
-### 5. Running the Development Server
-
-To start the development server:
-
-```bash
-trunk serve
-```
-
-The application will be available at `http://localhost:8080` by default.
-
-### 5. Development environment
-
-This project uses:
-- [Leptos](https://leptos.dev/) for reactive web UI
-- [Tailwind CSS](https://tailwindcss.com/) for styling
-
-## Common Issues and Solutions
-
-### Cross-platform compatibility
-
-For Windows users:
-- Use `npx` instead of direct commands in Trunk.toml
-- Make sure paths use forward slashes (/) even on Windows
-
-For Unix users:
-- Ensure shell scripts have execute permissions: `chmod +x *.sh`
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT License
-
-Copyright (c) 2025-2029 Ryan Khetlyr
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This summary should help us avoid repeating the same approaches in future conversations while we continue working toward a solution.
