@@ -1,7 +1,19 @@
 use leptos::*;
 use leptos::prelude::*;
 use crate::utils::{get_player_id, StorageError};
-use log::{error, warn};
+use log::{error, warn, info};
+use wasm_bindgen::prelude::*;
+
+// JavaScript console logging helper
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+// Create a global ID for testing
+#[derive(Clone)]
+struct PlayerIdState(String);
 
 #[component]
 pub fn DataButton() -> impl IntoView {
@@ -12,19 +24,36 @@ pub fn DataButton() -> impl IntoView {
     let (storage_error, set_storage_error) = create_signal(Option::<String>::None);
     
     // Get the player ID when the component initializes
-    let player_id = store_value({
-        let id = get_player_id();
-        if id.is_empty() {
-            let err_msg = "Failed to get or generate player ID".to_string();
-            error!("{}", err_msg);
-            set_storage_error.set(Some(err_msg));
-        }
-        id
-    });
+    let id = get_player_id();
+    
+    // Store player ID in global state for testing
+    provide_context(PlayerIdState(id.clone()));
+    
+    if id.is_empty() {
+        let err_msg = "Failed to get or generate player ID".to_string();
+        error!("{}", err_msg);
+        set_storage_error.set(Some(err_msg));
+    } else {
+        // Log the player ID to the console for debugging and testing
+        let log_msg = format!("PLAYER_ID_DATA: {}", id);
+        log(&log_msg);
+        info!("{}", log_msg);
+    }
+    
+    // Create a signal for the player ID to use in reactive contexts
+    let player_id = create_rw_signal(id);
     
     // Click handler for the button to show the panel
     let show_panel_click = move |_| {
         set_show_panel.set(true);
+        
+        // Log the player ID again when the panel is shown
+        let current_id = player_id.get();
+        if !current_id.is_empty() {
+            let log_msg = format!("PLAYER_ID_PANEL_OPENED: {}", current_id);
+            log(&log_msg);
+            info!("{}", log_msg);
+        }
     };
     
     // Click handler for the close button to hide the panel
@@ -79,7 +108,7 @@ pub fn DataButton() -> impl IntoView {
                                                 data-test-id="player-id"
                                                 class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700"
                                             >
-                                                {"Player ID: "}{player_id.get_value()}
+                                                {"Player ID: "}{player_id.get()}
                                             </p>
                                         }
                                     }
@@ -104,6 +133,11 @@ pub fn DataButton() -> impl IntoView {
     }
 }
 
+// Helper function to get the player ID in tests
+pub fn get_test_player_id() -> Option<String> {
+    use_context::<PlayerIdState>().map(|state| state.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,6 +146,13 @@ mod tests {
     use crate::test_utils::test::*;
     
     wasm_bindgen_test_configure!(run_in_browser);
+    
+    // Simplified console spy
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(js_namespace = console, js_name = log)]
+        fn console_log(s: &str);
+    }
     
     #[wasm_bindgen_test]
     async fn test_data_button_exists() {
@@ -185,6 +226,9 @@ mod tests {
         // Check that the player ID text starts with "Player ID: "
         assert!(player_id_text.starts_with("Player ID: "), 
             "Player ID should be formatted as 'Player ID: XXX'");
+            
+        // Print something to console for debugging
+        console_log("Test completed successfully!");
     }
     
     // New test for storage error display
