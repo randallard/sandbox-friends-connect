@@ -1,9 +1,160 @@
-# Check for Trunk.toml (optional file)
-if (-not (Test-Path -Path "Trunk.toml")) {
-    Write-Host "No Trunk.toml found. Will use default Trunk settings." -ForegroundColor Yellow
+# Helper function to run commands with logging
+function Run-Command {
+    param (
+        [string]$command,
+        [string]$description,
+        [switch]$continueOnError,
+        [switch]$isTest
+    )
+    
+    Log-Output "PROGRESS: $description" "Cyan"
+    
+    # Add the command to the log file
+    Add-Content -Path $logFile -Value "`n>>> EXECUTING: $command`n"
+    
+    # Create a temporary file to capture output
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    
+    # Run the command and capture output to temp file only (not to console)
+    Invoke-Expression -Command "$command 2>&1" | Out-File -FilePath $tempFile
+    
+    # Add the output to the log file (but not to console)
+    $output = Get-Content -Path $tempFile -Raw
+    Add-Content -Path $logFile -Value $output
+    
+    # Check if the command succeeded
+    if ($LASTEXITCODE -ne 0) {
+        if ($isTest) {
+            # For test commands, extract just what we want to show
+            $testOutput = Get-Content -Path $tempFile
+            
+            # 1. Show failing test lines - use a more flexible pattern
+            $failingTests = $testOutput | Select-String -Pattern "test .* \.\.\. FAIL(ED)?" | ForEach-Object { $_.Line }
+            
+            if ($failingTests.Count -gt 0) {
+                Write-Host "The following tests failed:" -ForegroundColor Red
+                foreach ($test in $failingTests) {
+                    Write-Host "  - $test" -ForegroundColor Red
+                }
+            }
+            
+            # 2. Show test result summary
+            $testSummary = $testOutput | Select-String -Pattern "test result:.*" | Select-Object -First 1
+            if ($testSummary) {
+                $summaryText = $testSummary.ToString()
+                
+                # Colorize the test result summary
+                if ($summaryText -match "(test result:) (FAILED|PASSED)(.*)") {
+                    $prefix = $matches[1]
+                    $result = $matches[2]
+                    $suffix = $matches[3]
+                    
+                    # Write prefix in cyan
+                    Write-Host $prefix -ForegroundColor Cyan -NoNewline
+                    
+                    # Write result in red (FAILED) or green (PASSED)
+                    if ($result -eq "FAILED") {
+                        Write-Host " $result" -ForegroundColor Red -NoNewline
+                    } else {
+                        Write-Host " $result" -ForegroundColor Green -NoNewline
+                    }
+                    
+                    # Write the rest in cyan
+                    Write-Host $suffix -ForegroundColor Cyan
+                }
+            }
+        }
+        
+        # Remove temp file
+        Remove-Item -Path $tempFile
+        
+        if (-not $continueOnError) {
+            # Just indicate where full details can be found, without extra error messages
+            Log-Output "See $logFile for full error details" "Yellow"
+            exit 1
+        } else {
+            return $false
+        }
+    }
+    else {
+        if ($isTest) {
+            # For successful tests, still show the summary
+            $testOutput = Get-Content -Path $tempFile
+            
+            # Display all failed tests - including when overall process succeeded but individual tests failed
+            $failingTests = $testOutput | Select-String -Pattern "test .* \.\.\.\ FAIL" | ForEach-Object { $_.Line }
+            if ($failingTests.Count -gt 0) {
+                Write-Host "The following tests failed:" -ForegroundColor Red
+                foreach ($test in $failingTests) {
+                    Write-Host "  - $test" -ForegroundColor Red
+                }
+            }
+            
+            $testSummary = $testOutput | Select-String -Pattern "test result:.*" | Select-Object -First 1
+            
+            if ($testSummary) {
+                $summaryText = $testSummary.ToString()
+                
+                # Colorize the test result summary
+                if ($summaryText -match "(test result:) (FAILED|PASSED)(.*)") {
+                    $prefix = $matches[1]
+                    $result = $matches[2]
+                    $suffix = $matches[3]
+                    
+                    # Write prefix in cyan
+                    Write-Host $prefix -ForegroundColor Cyan -NoNewline
+                    
+                    # Write result in green (PASSED)
+                    Write-Host " $result" -ForegroundColor Green -NoNewline
+                    
+                    # Write the rest in cyan
+                    Write-Host $suffix -ForegroundColor Cyan
+                }
+            }
+        }
+        
+        # Remove temp file
+        Remove-Item -Path $tempFile
+        
+        Log-Output "SUCCESS: $description completed" "Green"
+        return $true
+    }
+}
+
+# Set up logging
+$logFile = "test_run_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+Write-Host "Logging all output to $logFile" -ForegroundColor Cyan
+
+# Helper function to log output
+function Log-Output {
+    param (
+        [string]$message,
+        [string]$color = "White"
+    )
+    
+    # Write to console with minimal info
+    Write-Host $message -ForegroundColor $color
+    
+    # Write detailed message to log file
+    Add-Content -Path $logFile -Value $message
+}
+
+# Initialize log file with header
+$headerText = @"
+======================================================
+Leptos 0.7 CSR Test Runner
+Started: $(Get-Date)
+======================================================
+"@
+Add-Content -Path $logFile -Value $headerText
+
+# Check for Trunk.toml
+if (Test-Path -Path "Trunk.toml") {
+    Log-Output "FOUND: Custom Trunk.toml configuration" "Green"
+    Add-Content -Path $logFile -Value (Get-Content -Path "Trunk.toml" -Raw)
 } 
 else {
-    Write-Host "Using custom Trunk.toml configuration." -ForegroundColor Green
+    Log-Output "INFO: No Trunk.toml found, using default settings" "Yellow"
 }
 
 # Check Tailwind configuration
@@ -11,75 +162,64 @@ $usingCDN = $false
 if (Test-Path -Path "index.html") {
     $indexContent = Get-Content -Path "index.html" -Raw
     if ($indexContent -match "cdn\.tailwindcss\.com") {
-        Write-Host "Using Tailwind CSS via CDN." -ForegroundColor Green
+        Log-Output "FOUND: Tailwind CSS via CDN" "Green"
         $usingCDN = $true
     }
 }
 
 if (-not $usingCDN) {
-    # Check for Tailwind config
-    if (-not (Test-Path -Path "tailwind.config.js")) {
-        Write-Host "tailwind.config.js not found! Tailwind CSS may not be properly configured." -ForegroundColor Red
-        exit 1
-    } 
-    else {
-        Write-Host "Tailwind CSS configuration found." -ForegroundColor Green
+    # Check for Tailwind files
+    $tailwindFiles = @{
+        "tailwind.config.js" = $true
+        "postcss.config.js" = $false  # Optional
+        "input.css" = $true
     }
-
-    # Check for PostCSS config
-    if (-not (Test-Path -Path "postcss.config.js")) {
-        Write-Host "postcss.config.js not found! Tailwind CSS may not be properly configured." -ForegroundColor Yellow
-    } 
-    else {
-        Write-Host "PostCSS configuration found." -ForegroundColor Green
-    }
-
-    # Check for CSS input file
-    if (-not (Test-Path -Path "input.css")) {
-        Write-Host "input.css not found! Tailwind CSS may not be properly configured." -ForegroundColor Red
-        exit 1
-    } 
-    else {
-        Write-Host "Tailwind CSS input file found." -ForegroundColor Green
-    }
-
-    # Test Tailwind CSS compilation
-    Write-Host "Testing Tailwind CSS compilation..." -ForegroundColor Cyan
-    try {
-        npx tailwindcss -i input.css -o temp-output.css
-        if (Test-Path -Path "temp-output.css") {
-            Remove-Item -Path "temp-output.css"
-            Write-Host "Tailwind CSS compilation successful." -ForegroundColor Green
-        } else {
-            Write-Host "Tailwind CSS compilation failed to produce output file." -ForegroundColor Red
-            exit 1
+    
+    $configOk = $true
+    
+    foreach ($file in $tailwindFiles.Keys) {
+        $required = $tailwindFiles[$file]
+        if (Test-Path -Path $file) {
+            Log-Output "FOUND: $file" "Green"
+            Add-Content -Path $logFile -Value ("`n>>> CONTENT OF " + $file + ":`n")
+            Add-Content -Path $logFile -Value (Get-Content -Path $file -Raw)
         }
-    } catch {
-        Write-Host "Error running Tailwind CSS compilation: $_" -ForegroundColor Red
+        elseif ($required) {
+            Log-Output "ERROR: Required file $file is missing" "Red"
+            $configOk = $false
+        }
+        else {
+            Log-Output "WARNING: Optional file $file is missing" "Yellow"
+        }
+    }
+    
+    if (-not $configOk) {
+        Log-Output "ERROR: Critical Tailwind CSS files are missing" "Red"
+        exit 1
+    }
+    
+    # Test Tailwind CSS compilation
+    Run-Command -command "npx tailwindcss -i input.css -o temp-output.css" -description "Testing Tailwind CSS compilation"
+    
+    if (Test-Path -Path "temp-output.css") {
+        Remove-Item -Path "temp-output.css"
+    } else {
+        Log-Output "ERROR: Tailwind CSS compilation failed to produce output file" "Red"
         exit 1
     }
 }
 
-# Run standard Rust tests first
-Write-Host "Running cargo tests..." -ForegroundColor Cyan
-cargo test
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Cargo tests failed!" -ForegroundColor Red
-    exit 1
-}
-Write-Host "Cargo tests passed!" -ForegroundColor Green
+# Run standard Rust tests
+Run-Command -command "cargo test" -description "Running Rust unit tests" -isTest
 
-# If cargo tests pass, run wasm tests
-Write-Host "Running wasm tests..." -ForegroundColor Cyan
-wasm-pack test --firefox --headless
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Wasm tests failed!" -ForegroundColor Red
-    exit 1
-}
-Write-Host "Wasm tests passed!" -ForegroundColor Green
+# Run wasm tests
+Run-Command -command "wasm-pack test --firefox --headless" -description "Running WebAssembly tests" -isTest
 
-Write-Host "All tests passed successfully!" -ForegroundColor Green
-Write-Host "Starting Trunk development server..." -ForegroundColor Cyan
+Log-Output "SUCCESS: All tests passed successfully! 🎉" "Green"
+Log-Output "PROGRESS: Starting Trunk development server..." "Cyan"
+
+# Add final timestamp to log
+Add-Content -Path $logFile -Value "`n======================================================`nStarting Trunk server: $(Get-Date)`n======================================================"
 
 # Start the trunk server
 trunk serve
