@@ -71,8 +71,13 @@ pub fn get_dark_mode_preference() -> bool {
     match get_storage_item("dark_mode") {
         Ok(Some(val)) => val == "true",
         _ => {
-            info!("Could not retrieve dark mode preference, defaulting to light mode");
-            false
+            // Generate a default preference (light mode) and store it
+            let default_preference = false; // default to light mode
+            if let Err(err) = set_storage_item("dark_mode", if default_preference { "true" } else { "false" }) {
+                error!("Failed to save default dark mode preference: {:?}", err);
+            }
+            info!("No dark mode preference found, defaulting to light mode");
+            default_preference
         }
     }
 }

@@ -1,6 +1,6 @@
 use leptos::*;
 use leptos::prelude::*;
-use crate::utils::{get_player_id, StorageError};
+use crate::utils::{get_player_id, get_dark_mode_preference, save_dark_mode_preference, StorageError};
 use log::{error, warn, info};
 use wasm_bindgen::prelude::*;
 
@@ -15,6 +15,10 @@ extern "C" {
 #[derive(Clone)]
 struct PlayerIdState(String);
 
+// Create a global dark mode state for testing
+#[derive(Clone)]
+struct DarkModeState(bool);
+
 #[component]
 pub fn DataButton() -> impl IntoView {
     // Create a signal to track whether we're showing the button or panel
@@ -26,8 +30,12 @@ pub fn DataButton() -> impl IntoView {
     // Get the player ID when the component initializes
     let id = get_player_id();
     
-    // Store player ID in global state for testing
+    // Get the dark mode preference
+    let dark_mode = get_dark_mode_preference();
+    
+    // Store player ID and dark mode in global state for testing
     provide_context(PlayerIdState(id.clone()));
+    provide_context(DarkModeState(dark_mode));
     
     if id.is_empty() {
         let err_msg = "Failed to get or generate player ID".to_string();
@@ -40,8 +48,9 @@ pub fn DataButton() -> impl IntoView {
         info!("{}", log_msg);
     }
     
-    // Create a signal for the player ID to use in reactive contexts
+    // Create signals for the player ID and dark mode to use in reactive contexts
     let player_id = create_rw_signal(id);
+    let (dark_mode_preference, set_dark_mode_preference) = create_signal(dark_mode);
     
     // Click handler for the button to show the panel
     let show_panel_click = move |_| {
@@ -59,6 +68,24 @@ pub fn DataButton() -> impl IntoView {
     // Click handler for the close button to hide the panel
     let hide_panel_click = move |_| {
         set_show_panel.set(false);
+    };
+    
+    // Click handler for toggling dark mode
+    let toggle_dark_mode = move |_| {
+        let new_preference = !dark_mode_preference.get();
+        set_dark_mode_preference.set(new_preference);
+        
+        // Save the new preference
+        if let Err(err) = save_dark_mode_preference(new_preference) {
+            let err_msg = format!("Failed to save dark mode preference: {:?}", err);
+            error!("{}", err_msg);
+            set_storage_error.set(Some(err_msg));
+        } else {
+            // Log the dark mode change
+            let log_msg = format!("DARK_MODE_CHANGED: {}", new_preference);
+            log(&log_msg);
+            info!("{}", log_msg);
+        }
     };
     
     view! {
@@ -101,16 +128,31 @@ pub fn DataButton() -> impl IntoView {
                                             >
                                                 {"Error: "}{error}
                                             </p>
-                                        }
+                                        }.into_any()
                                     } else {
                                         view! {
-                                            <p 
-                                                data-test-id="player-id"
-                                                class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700"
-                                            >
-                                                {"Player ID: "}{player_id.get()}
-                                            </p>
-                                        }
+                                            <div>
+                                                <p 
+                                                    data-test-id="player-id"
+                                                    class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700"
+                                                >
+                                                    {"Player ID: "}{player_id.get()}
+                                                </p>
+                                                <div 
+                                                    data-test-id="dark-mode-setting"
+                                                    class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700 flex justify-between items-center"
+                                                >
+                                                    <span>{"Dark Mode: "}{if dark_mode_preference.get() { "Enabled" } else { "Disabled" }}</span>
+                                                    <button
+                                                        data-test-id="dark-mode-toggle"
+                                                        class="ml-4 px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-sm"
+                                                        on:click={toggle_dark_mode}
+                                                    >
+                                                        {if dark_mode_preference.get() { "Disable" } else { "Enable" }}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }.into_any()
                                     }
                                 }}
                             </div>
@@ -136,6 +178,11 @@ pub fn DataButton() -> impl IntoView {
 // Helper function to get the player ID in tests
 pub fn get_test_player_id() -> Option<String> {
     use_context::<PlayerIdState>().map(|state| state.0)
+}
+
+// Helper function to get the dark mode preference in tests
+pub fn get_test_dark_mode() -> Option<bool> {
+    use_context::<DarkModeState>().map(|state| state.0)
 }
 
 #[cfg(test)]
@@ -199,6 +246,10 @@ mod tests {
         // Check that player ID element exists
         let player_id_element = get_by_test_id("player-id");
         assert!(player_id_element.is_object(), "Player ID element should exist in the data panel");
+
+        // Check that dark mode setting element exists
+        let dark_mode_element = get_by_test_id("dark-mode-setting");
+        assert!(dark_mode_element.is_object(), "Dark mode setting element should exist in the data panel");
     }
     
     #[wasm_bindgen_test]

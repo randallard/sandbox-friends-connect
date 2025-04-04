@@ -176,3 +176,47 @@ async fn test_logging_integration() {
     log("Logging test completed successfully");
     assert!(true, "Logging should not cause exceptions");
 }
+
+#[wasm_bindgen_test]
+async fn test_data_button_dark_mode_integration() {
+    reset_storage().await;
+    
+    // Log the start of the test
+    log("Starting dark mode integration test");
+    
+    // Mount the App component
+    mount_to_body(|| view! { <App /> });
+    
+    // Wait for component initialization
+    TimeoutFuture::new(100).await;
+    
+    // Click the data button to show the panel
+    let data_button = get_by_test_id("data-button");
+    if data_button.is_undefined() {
+        log("ERROR: Could not find data-button");
+        assert!(false, "Could not find data-button");
+        return;
+    }
+    
+    // Click and wait
+    click_and_wait(&data_button, 100).await;
+    
+    // Get the dark mode element from the panel
+    let dark_mode_element = get_by_test_id("dark-mode-setting");
+    if dark_mode_element.is_undefined() {
+        log("ERROR: Could not find dark-mode-setting element");
+        assert!(false, "Could not find dark-mode-value element");
+        return;
+    }
+    
+    // Log the element content for debugging
+    log(&format!("Dark mode element found with text: {}", 
+        dark_mode_element.text_content().unwrap_or_default()));
+    
+    // Verify the dark mode value is displayed correctly
+    let dark_mode_text = dark_mode_element.text_content().unwrap_or_default();
+    assert!(dark_mode_text.contains("Dark Mode:"), 
+        "Panel should display the dark mode value");
+    
+    log("Test completed successfully!");
+}
