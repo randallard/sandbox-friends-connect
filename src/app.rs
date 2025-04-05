@@ -1,104 +1,47 @@
 use leptos::*;
 use leptos::prelude::*;
 use crate::data::DataButton;
-use crate::utils::{get_dark_mode_preference, save_dark_mode_preference};
+use crate::theme::{ThemeProvider, use_container_class, use_card_class, use_header_class, 
+                  use_paragraph_class, use_button_class, use_toggle_class, use_toggle_text, use_theme};
 use log::{error, info}; // Import log macros
 
 #[component]
 pub fn App() -> impl IntoView {
-    // Create a signal to track dark mode state, initialized from localStorage
-    let (dark_mode, set_dark_mode) = create_signal(get_dark_mode_preference());
-    
     // Message for user feedback
     let (storage_message, set_storage_message) = create_signal(Option::<String>::None);
     
-    // Toggle function for the dark mode
-    let toggle_dark_mode = move |_| {
-        set_dark_mode.update(|dark| {
-            *dark = !*dark;
-            
-            // Handle the result of saving the preference
-            match save_dark_mode_preference(*dark) {
-                Ok(_) => {
-                    // Clear any previous error messages after a short delay
-                    set_storage_message.set(None);
-                },
-                Err(err) => {
-                    // Display the error message to the user
-                    set_storage_message.set(Some(format!("Failed to save preference: {:?}", err)));
-                    
-                    // Log the error for debugging
-                    error!("Failed to save dark mode preference: {:?}", err);
-                }
-            };
-        });
-    };
-    
-    // Dynamic class for container based on dark mode
-    let container_class = move || {
-        if dark_mode.get() {
-            "min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col items-center justify-center p-4 dark"
-        } else {
-            "min-h-screen bg-gradient-to-b from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4"
-        }
-    };
-    
-    // Dynamic class for the card
-    let card_class = move || {
-        if dark_mode.get() {
-            "bg-gray-800 rounded-xl shadow-lg p-8 max-w-md w-full"
-        } else {
-            "bg-white rounded-xl shadow-lg p-8 max-w-md w-full"
-        }
-    };
-    
-    // Dynamic class for header
-    let header_class = move || {
-        if dark_mode.get() {
-            "text-3xl font-bold text-center text-purple-400 mb-6"
-        } else {
-            "text-3xl font-bold text-center text-indigo-600 mb-6"
-        }
-    };
-    
-    // Dynamic class for paragraph
-    let paragraph_class = move || {
-        if dark_mode.get() {
-            "text-gray-300 text-center mb-6"
-        } else {
-            "text-gray-600 text-center mb-6"
-        }
-    };
-    
-    // Dynamic class for button
-    let button_class = move || {
-        if dark_mode.get() {
-            "bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors mr-2"
-        } else {
-            "bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg transition-colors mr-2"
-        }
-    };
-    
-    // Dynamic class for the toggle button
-    let toggle_class = move || {
-        if dark_mode.get() {
-            "bg-amber-700 hover:bg-amber-800 text-gray-100 font-medium py-2 px-4 rounded-lg transition-colors flex items-center"
-        } else {
-            "bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center"
-        }
-    };
-    
-    // Dynamic toggle icon/text
-    let toggle_text = move || {
-        if dark_mode.get() {
-            "🌙 Dark"
-        } else {
-            "☀️ Light"
-        }
-    };
-    
     // Error message class
     let error_class = "mt-4 p-2 bg-red-100 text-red-700 rounded-md text-sm";
+    
+    view! {
+        <ThemeProvider>
+            <AppContent storage_message={storage_message} set_storage_message={set_storage_message} error_class={error_class} />
+        </ThemeProvider>
+    }
+}
+
+#[component]
+fn AppContent(
+    storage_message: ReadSignal<Option<String>>,
+    set_storage_message: WriteSignal<Option<String>>,
+    error_class: &'static str,
+) -> impl IntoView {
+    // Get theme helpers
+    let container_class = use_container_class();
+    let card_class = use_card_class();
+    let header_class = use_header_class();
+    let paragraph_class = use_paragraph_class();
+    let button_class = use_button_class();
+    let toggle_class = use_toggle_class();
+    let toggle_text = use_toggle_text();
+    
+    // Get theme context for the toggle action
+    let theme = use_theme();
+    
+    // Toggle function for the dark mode using the action from theme context
+    let toggle_dark_mode = move |_| {
+        theme.toggle_theme.dispatch(());
+    };
     
     view! {
         <div

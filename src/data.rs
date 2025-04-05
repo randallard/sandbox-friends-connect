@@ -1,6 +1,8 @@
 use leptos::*;
 use leptos::prelude::*;
 use crate::utils::{get_player_id, get_dark_mode_preference, save_dark_mode_preference, StorageError};
+use crate::theme::{use_theme, use_button_class, use_data_panel_class, use_data_header_class, 
+                  use_data_content_class, use_data_close_button_class, use_player_id_class};
 use log::{error, warn, info};
 use wasm_bindgen::prelude::*;
 
@@ -30,8 +32,9 @@ pub fn DataButton() -> impl IntoView {
     // Get the player ID when the component initializes
     let id = get_player_id();
     
-    // Get the dark mode preference
-    let dark_mode = get_dark_mode_preference();
+    // Get the theme context (includes dark mode state)
+    let theme = use_theme();
+    let dark_mode = theme.dark_mode;
     
     // Store player ID and dark mode in global state for testing
     provide_context(PlayerIdState(id.clone()));
@@ -48,9 +51,17 @@ pub fn DataButton() -> impl IntoView {
         info!("{}", log_msg);
     }
     
-    // Create signals for the player ID and dark mode to use in reactive contexts
+    // Create signals for the player ID to use in reactive contexts
     let player_id = create_rw_signal(id);
-    let (dark_mode_preference, set_dark_mode_preference) = create_signal(dark_mode);
+    let dark_mode_preference = create_rw_signal(dark_mode);
+    
+    // Get styling hooks
+    let button_class = use_button_class();
+    let data_panel_class = use_data_panel_class();
+    let data_header_class = use_data_header_class();
+    let data_content_class = use_data_content_class();
+    let data_close_button_class = use_data_close_button_class();
+    let player_id_class = use_player_id_class();
     
     // Click handler for the button to show the panel
     let show_panel_click = move |_| {
@@ -70,22 +81,27 @@ pub fn DataButton() -> impl IntoView {
         set_show_panel.set(false);
     };
     
-    // Click handler for toggling dark mode
-    let toggle_dark_mode = move |_| {
-        let new_preference = !dark_mode_preference.get();
-        set_dark_mode_preference.set(new_preference);
-        
-        // Save the new preference
-        if let Err(err) = save_dark_mode_preference(new_preference) {
-            let err_msg = format!("Failed to save dark mode preference: {:?}", err);
-            error!("{}", err_msg);
-            set_storage_error.set(Some(err_msg));
-        } else {
-            // Log the dark mode change
-            let log_msg = format!("DARK_MODE_CHANGED: {}", new_preference);
-            log(&log_msg);
-            info!("{}", log_msg);
+    // Create a reactive signal to track dark mode from the theme context
+    let dark_mode_signal = create_memo(move |_| theme.dark_mode);
+    
+    // Create an effect to update our local preference when theme changes
+    create_effect(move |_| {
+        // Update our local reactive signal to match the global state
+        let current_theme_value = dark_mode_signal.get();
+        if dark_mode_preference.get() != current_theme_value {
+            dark_mode_preference.set(current_theme_value);
         }
+    });
+    
+    // Click handler for toggling dark mode using the theme context's action
+    let toggle_dark_mode = move |_| {
+        theme.toggle_theme.dispatch(());
+        
+        // Log the dark mode change - we'll use the signal's new value after toggle
+        let new_preference = !dark_mode_preference.get(); // Predict new value
+        let log_msg = format!("DARK_MODE_CHANGED: {}", new_preference);
+        log(&log_msg);
+        info!("{}", log_msg);
     };
     
     view! {
@@ -95,19 +111,19 @@ pub fn DataButton() -> impl IntoView {
                     // Panel view
                     view! {
                         <div 
-                            class="bg-white rounded-lg shadow-lg p-4 border border-gray-200"
+                            class={data_panel_class}
                             data-test-id="data-panel"
                         >
                             <div class="flex justify-between items-center mb-4">
                                 <h2 
                                     data-test-id="data-header"
-                                    class="text-xl font-semibold text-indigo-700"
+                                    class={data_header_class}
                                 >
                                     "Locally Stored Data"
                                 </h2>
                                 <button
                                     data-test-id="data-close-button"
-                                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 p-1 rounded-lg"
+                                    class={data_close_button_class}
                                     on:click={hide_panel_click}
                                 >
                                     "×"
@@ -115,7 +131,7 @@ pub fn DataButton() -> impl IntoView {
                             </div>
                             <div 
                                 data-test-id="data-content"
-                                class="p-4 bg-indigo-50 rounded border border-indigo-100 text-indigo-900 font-medium"
+                                class={data_content_class}
                             >
                                 <p>"Your locally stored data would appear here."</p>
                                 
@@ -134,13 +150,13 @@ pub fn DataButton() -> impl IntoView {
                                             <div>
                                                 <p 
                                                     data-test-id="player-id"
-                                                    class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700"
+                                                    class={player_id_class}
                                                 >
                                                     {"Player ID: "}{player_id.get()}
                                                 </p>
                                                 <div 
                                                     data-test-id="dark-mode-setting"
-                                                    class="mt-2 pt-2 border-t border-indigo-200 text-indigo-700 flex justify-between items-center"
+                                                    class={player_id_class}
                                                 >
                                                     <span>{"Dark Mode: "}{if dark_mode_preference.get() { "Enabled" } else { "Disabled" }}</span>
                                                     <button
@@ -163,7 +179,7 @@ pub fn DataButton() -> impl IntoView {
                     view! {
                         <button
                             data-test-id="data-button"
-                            class="bg-indigo-500 hover:bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                            class={button_class}
                             on:click={show_panel_click}
                         >
                             "Locally Stored Data"
@@ -203,8 +219,12 @@ mod tests {
     
     #[wasm_bindgen_test]
     async fn test_data_button_exists() {
-        // Mount the DataButton component to the body
-        mount_to_body(|| view! { <DataButton /> });
+        // We need to provide a theme context for testing
+        mount_to_body(|| view! { 
+            <crate::theme::ThemeProvider>
+                <DataButton />
+            </crate::theme::ThemeProvider>
+        });
         
         // Use the helper function to get the element by test ID
         let data_button = get_by_test_id("data-button");
@@ -217,8 +237,12 @@ mod tests {
 
     #[wasm_bindgen_test]
     async fn test_data_button_shows_panel_when_clicked() {
-        // Mount the DataButton component to the body
-        mount_to_body(|| view! { <DataButton /> });
+        // Mount the DataButton component with theme provider
+        mount_to_body(|| view! { 
+            <crate::theme::ThemeProvider>
+                <DataButton />
+            </crate::theme::ThemeProvider>
+        });
         
         // Get the data button
         let data_button = get_by_test_id("data-button");
@@ -254,8 +278,12 @@ mod tests {
     
     #[wasm_bindgen_test]
     async fn test_data_panel_shows_player_id() {
-        // Mount the DataButton component to the body
-        mount_to_body(|| view! { <DataButton /> });
+        // Mount the DataButton component with theme provider
+        mount_to_body(|| view! { 
+            <crate::theme::ThemeProvider>
+                <DataButton />
+            </crate::theme::ThemeProvider>
+        });
         
         // Get the data button
         let data_button = get_by_test_id("data-button");
@@ -289,7 +317,11 @@ mod tests {
         // Note: For a full test we would need to mock localStorage failures
         
         // Since mocking is complex, we're just checking the component structure
-        mount_to_body(|| view! { <DataButton /> });
+        mount_to_body(|| view! { 
+            <crate::theme::ThemeProvider>
+                <DataButton />
+            </crate::theme::ThemeProvider>
+        });
         
         // Get the data button and click it
         let data_button = get_by_test_id("data-button");

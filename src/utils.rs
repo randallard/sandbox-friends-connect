@@ -87,7 +87,47 @@ pub fn save_dark_mode_preference(is_dark: bool) -> Result<(), StorageError> {
     set_storage_item("dark_mode", if is_dark { "true" } else { "false" })
 }
 
-// Add these tests to the bottom of utils.rs
+// Add a new localStorage module with test-friendly helpers
+pub mod localStorage {
+    use super::*;
+    use wasm_bindgen::JsValue;
+
+    /// Safely accesses the local storage and performs an operation that returns a Result
+    pub fn with_local_storage<F, T>(f: F) -> Result<T, JsValue>
+    where
+        F: FnOnce(&web_sys::Storage) -> Result<T, JsValue>,
+    {
+        let window = web_sys::window().ok_or_else(|| JsValue::from_str("No window found"))?;
+        let storage = window.local_storage()?.ok_or_else(|| JsValue::from_str("No localStorage found"))?;
+        f(&storage)
+    }
+
+    /// Reset a localStorage item by removing it
+    pub fn reset_storage_item(key: &str) -> Result<(), JsValue> {
+        with_local_storage(|storage| storage.remove_item(key))
+    }
+
+    /// Set a localStorage item
+    pub fn set_storage_item(key: &str, value: &str) -> Result<(), JsValue> {
+        with_local_storage(|storage| storage.set_item(key, value))
+    }
+
+    /// Get a localStorage item
+    pub fn get_storage_item(key: &str) -> Result<Option<String>, JsValue> {
+        with_local_storage(|storage| storage.get_item(key))
+    }
+
+    /// Test helper to reset localStorage for tests
+    pub fn reset_theme_storage() {
+        let _ = reset_storage_item("dark_mode");
+    }
+
+    /// Test helper to reset all app storage 
+    pub fn reset_all_storage() {
+        let _ = reset_storage_item("dark_mode");
+        let _ = reset_storage_item("player_id");
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -314,5 +354,51 @@ mod tests {
             },
             _ => panic!("JS error should be converted to GetError variant")
         }
+    }
+    
+    // Tests for the new localStorage module helpers
+    #[wasm_bindgen_test]
+    async fn test_with_local_storage() {
+        let test_key = "test_with_key";
+        let test_value = "test_with_value";
+        
+        // Test that with_local_storage works for multiple operations
+        let result = localStorage::with_local_storage(|storage| {
+            let _ = storage.remove_item(test_key)?;
+            let _ = storage.set_item(test_key, test_value)?;
+            storage.get_item(test_key)
+        });
+        
+        assert!(result.is_ok(), "with_local_storage should execute successfully");
+        assert_eq!(result.unwrap().unwrap(), test_value, "Should retrieve the correct value");
+        
+        // Clean up
+        let _ = localStorage::reset_storage_item(test_key);
+    }
+    
+    #[wasm_bindgen_test]
+    async fn test_localStorage_helpers() {
+        let test_key = "test_localStorage_key";
+        let test_value = "test_localStorage_value";
+        
+        // Reset the key first
+        let reset_result = localStorage::reset_storage_item(test_key);
+        assert!(reset_result.is_ok(), "reset_storage_item should execute successfully");
+        
+        // Set the value using the new helper
+        let set_result = localStorage::set_storage_item(test_key, test_value);
+        assert!(set_result.is_ok(), "set_storage_item should execute successfully");
+        
+        // Get the value using the new helper
+        let get_result = localStorage::get_storage_item(test_key);
+        assert!(get_result.is_ok(), "get_storage_item should execute successfully");
+        assert_eq!(get_result.unwrap().unwrap(), test_value, "Should retrieve the correct value");
+        
+        // Reset all app storage
+        localStorage::reset_all_storage();
+        
+        // Verify the item was removed
+        let get_after_reset = localStorage::get_storage_item(test_key);
+        assert_eq!(get_after_reset.unwrap(), None, "Item should be removed after reset_all_storage");
     }
 }

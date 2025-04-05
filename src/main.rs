@@ -3,6 +3,7 @@ mod app;
 mod test_utils;
 mod data;
 mod utils;
+mod theme;  // Add the theme module
 
 // Add our new test modules
 #[cfg(test)]
@@ -11,6 +12,12 @@ mod mock_logger;
 mod integration_tests;
 #[cfg(test)]
 mod log_integration_tests;
+#[cfg(test)]
+mod theme_tests;
+
+#[cfg(test)]
+mod theme_provider_tests;  // Only needed if you keep them separate
+
 
 use leptos::*;
 use leptos::prelude::*;
