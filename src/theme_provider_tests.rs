@@ -29,7 +29,7 @@ mod theme_provider_tests {
             
             view! {
                 <div data-test-id="theme-child">
-                    {if theme.dark_mode { "Dark" } else { "Light" }}
+                    {if theme.dark_mode.get() { "Dark" } else { "Light" }}
                 </div>
             }
         }

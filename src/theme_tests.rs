@@ -20,7 +20,7 @@ mod theme_tests {
         };
         
         view! {
-            <div class=format!("theme-test-container {}", if theme.dark_mode { "dark" } else { "light" })>
+            <div class=format!("theme-test-container {}", if theme.dark_mode.get() { "dark" } else { "light" })>
                 <p data-test-id="theme-status">
                     if theme.dark_mode {
                         "Dark Mode"

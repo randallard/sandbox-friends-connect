@@ -42,12 +42,18 @@ pub fn DataButton() -> impl IntoView {
         set_storage_error.set(Some(err_msg));
     }
     
-    let player_id = create_rw_signal(id);
-    let dark_mode_preference = create_rw_signal(dark_mode);
-
-    // Get the theme context
     let theme = use_theme();
     let dark_mode = theme.dark_mode;
+    let player_id = create_rw_signal(id);
+    let dark_mode_preference = create_rw_signal(dark_mode);
+    let dark_mode_signal = create_memo(move |_| theme.dark_mode);
+    create_effect(move |_| {
+        // Update our local reactive signal to match the global state
+        let current_theme_value = dark_mode_signal.get();
+        if dark_mode_preference.get() != current_theme_value {
+            dark_mode_preference.set(current_theme_value);
+        }
+    });
 
     // Click handler for the button to show the panel
     let show_panel_click = move |_| {
@@ -71,8 +77,8 @@ pub fn DataButton() -> impl IntoView {
         theme.toggle_theme.dispatch(());
         
         // Log the dark mode change
-        let new_mode = if dark_mode { "Disabled" } else { "Enabled" };
-        let log_msg = format!("DARK_MODE_CHANGED: {}", !dark_mode);
+        let new_preference = !dark_mode.get(); // Predict new value
+        let log_msg = format!("DARK_MODE_CHANGED: {}", new_preference);
         log(&log_msg);
         info!("{}", log_msg);
     };
@@ -125,13 +131,13 @@ pub fn DataButton() -> impl IntoView {
                                                     {"Player ID: "}{player_id.get()}
                                                 </p>
                                                 <p>
-                                                    {"Dark Mode: "}{if dark_mode { "Enabled" } else { "Disabled" }}
+                                                    <span>{"Dark Mode: "}{if dark_mode.get() { "Enabled" } else { "Disabled" }}</span>
                                                     <button
                                                         data-test-id="dark-mode-toggle"
                                                         class={use_dark_mode_toggle_button_class}
                                                         on:click={toggle_dark_mode}
                                                     >
-                                                        {if dark_mode { "Disable" } else { "Enable" }}
+                                                        {if dark_mode.get() { "Disable" } else { "Enable" }}
                                                     </button>
                                                 </p>
                                             </div>

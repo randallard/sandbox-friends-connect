@@ -5,7 +5,7 @@ use crate::test_utils::test::*;
 use crate::app::App;
 use crate::utils::*;
 use crate::utils::localStorage::reset_all_storage;
-use crate::data::get_test_player_id;
+// use crate::data::get_test_player_id;
 use web_sys::{console, Storage};
 use wasm_bindgen::JsCast;
 use gloo_timers::future::TimeoutFuture;
