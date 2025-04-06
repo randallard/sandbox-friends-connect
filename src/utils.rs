@@ -378,7 +378,8 @@ mod tests {
     
     #[wasm_bindgen_test]
     async fn test_localStorage_helpers() {
-        let test_key = "test_localStorage_key";
+        // Use "dark_mode" instead of "test_localStorage_key"
+        let test_key = "dark_mode"; 
         let test_value = "test_localStorage_value";
         
         // Reset the key first
