@@ -7,7 +7,8 @@ use crate::theme::{
     use_data_panel_class, 
     use_data_header_class, 
     use_data_close_button_class, 
-    use_data_content_class, 
+    use_data_content_class,
+    use_error_message_class, 
     use_player_id_class
 };
 use log::{error, info};
@@ -24,6 +25,7 @@ extern "C" {
 pub fn DataButton() -> impl IntoView {
     // Create a signal to track whether we're showing the button or panel
     let (show_panel, set_show_panel) = create_signal(false);
+    let (storage_error, set_storage_error) = create_signal(Option::<String>::None);
 
     // Get the player ID when the component initializes
     let id = get_player_id();
@@ -34,7 +36,9 @@ pub fn DataButton() -> impl IntoView {
         log(&log_msg);
         info!("{}", log_msg);
     } else {
-        error!("Failed to get or generate player ID");
+        let err_msg = "Failed to get or generate player ID".to_string();
+        error!("{}", err_msg);
+        set_storage_error.set(Some(err_msg));
     }
     
     let player_id = create_rw_signal(id);
@@ -42,13 +46,6 @@ pub fn DataButton() -> impl IntoView {
     // Get the theme context
     let theme = use_theme();
     let dark_mode = theme.dark_mode;
-
-    let button_class = use_button_class.clone();
-    let data_panel_class = use_data_panel_class.clone();
-    let data_header_class = use_data_header_class.clone();
-    let data_close_button_class = use_data_close_button_class.clone();
-    let data_content_class = use_data_content_class.clone();
-    let player_id_class = use_player_id_class.clone();
 
     // Click handler for the button to show the panel
     let show_panel_click = move |_| {
@@ -68,34 +65,60 @@ pub fn DataButton() -> impl IntoView {
         set_show_panel.set(false);
     };
 
-    let show_panel_for_view = show_panel.clone();
-    let show_panel_click_for_view = show_panel_click.clone();
-    let hide_panel_click_for_view = hide_panel_click.clone();
-    let player_id_for_view = player_id.clone();
-    let dark_mode_for_view = dark_mode.clone();
-
     view! {
         <div class="mt-6">
             {move || {
-                if show_panel_for_view.get() {
+                if show_panel.get() {
                     // Panel view
                     view! {
-                        <div class={data_panel_class}>
+                        <div class={use_data_panel_class}
+                            data-test-id="data-panel">
                             <div class="flex justify-between items-center mb-4">
-                                <h2 class={data_header_class}>
+                                <h2 
+                                    data-test-id="data-header"
+                                    class={use_data_header_class}
+                                >
                                     "Locally Stored Data"
                                 </h2>
                                 <button
-                                    class={data_close_button_class}
-                                    on:click={hide_panel_click_for_view}
+                                    data-test-id="data-close-button"
+                                    class={use_data_close_button_class}
+                                    on:click={hide_panel_click}
                                 >
                                     "×"
                                 </button>
                             </div>
-                            <div>
+                            <div 
+                                data-test-id="data-content"
+                                class={use_data_content_class}
+                            >
                                 <p>"Your locally stored data:"</p>
-                                <p>{"Player ID: "}{player_id_for_view.get()}</p>
-                                <p>{"Dark Mode: "}{if dark_mode_for_view { "Enabled" } else { "Disabled" }}</p>
+                                {move || {
+                                    if let Some(error) = storage_error.get() {
+                                        view! {
+                                            <p 
+                                                data-test-id="storage-error"
+                                                class={use_error_message_class}
+                                            >
+                                                {"Error: "}{error}
+                                            </p>
+                                        }.into_any()
+                                    } else {
+                                        view! {
+                                            <div>
+                                                <p 
+                                                    data-test-id="player-id"
+                                                    class={use_player_id_class}
+                                                >
+                                                    {"Player ID: "}{player_id.get()}
+                                                </p>
+                                                <p>
+                                                    {"Dark Mode: "}{if dark_mode { "Enabled" } else { "Disabled" }}
+                                                </p>
+                                            </div>
+                                        }.into_any()
+                                    }
+                                }}
                             </div>
                         </div>
                     }.into_any()
@@ -103,8 +126,9 @@ pub fn DataButton() -> impl IntoView {
                     // Button view
                     view! {
                         <button
-                            class={button_class}
-                            on:click={show_panel_click_for_view}
+                            data-test-id="data-button"
+                            class={use_button_class}
+                            on:click={show_panel_click}
                         >
                             "Locally Stored Data"
                         </button>

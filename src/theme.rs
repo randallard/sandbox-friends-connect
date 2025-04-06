@@ -82,6 +82,19 @@ pub fn use_card_class() -> impl Fn() -> String {
     }
 }
 
+pub fn use_error_message_class() -> impl Fn() -> String {
+    let theme_state = use_context::<ThemeState>().expect("ThemeState should be provided");
+    let dark_mode = MaybeSignal::derive(move || theme_state.dark_mode);
+    
+    move || {
+        if dark_mode.get() {
+            "mt-2 p-2 bg-red-900 text-red-300 rounded-md border border-red-800".to_string()
+        } else {
+            "mt-2 p-2 bg-red-100 text-red-700 rounded-md border border-red-200".to_string()
+        }
+    }
+}
+
 pub fn use_header_class() -> impl Fn() -> String {
     let theme_state = use_context::<ThemeState>().expect("ThemeState should be provided");
     let dark_mode = MaybeSignal::derive(move || theme_state.dark_mode);
