@@ -64,6 +64,29 @@ function Run-Command {
                 }
             }
         }
+        else {
+            # For build errors, show the key error messages
+            $buildOutput = Get-Content -Path $tempFile
+            
+            # Look for error messages
+            $errorMessages = $buildOutput | Select-String -Pattern "error(\[E\d+\])?:"
+            
+            if ($errorMessages.Count -gt 0) {
+                Write-Host "Build errors detected:" -ForegroundColor Red
+                
+                # Process each error to extract relevant parts
+                foreach ($error in $errorMessages) {
+                    # Display each error line
+                    Write-Host "  $($error.Line)" -ForegroundColor Red
+                }
+                
+                # Also check for "could not compile" messages which give summary info
+                $compileErrors = $buildOutput | Select-String -Pattern "error: could not compile"
+                foreach ($error in $compileErrors) {
+                    Write-Host "  $($error.Line)" -ForegroundColor Red
+                }
+            }
+        }
         
         # Remove temp file
         Remove-Item -Path $tempFile
@@ -110,6 +133,20 @@ function Run-Command {
                     # Write the rest in cyan
                     Write-Host $suffix -ForegroundColor Cyan
                 }
+            } else {
+                # If we can't find a test summary but the command succeeded,
+                # print an explicit success message
+                Log-Output "Rust unit tests passed successfully!" "Green"
+            }
+        }
+        else {
+            # For non-test commands that succeeded, we might still want to show warnings
+            $buildOutput = Get-Content -Path $tempFile
+            $warningMessages = $buildOutput | Select-String -Pattern "warning:"
+            
+            if ($warningMessages.Count -gt 0) {
+                Write-Host "Warnings detected (but build succeeded):" -ForegroundColor Yellow
+                Write-Host "  $($warningMessages.Count) warnings found - see log for details" -ForegroundColor Yellow
             }
         }
         
@@ -240,12 +277,26 @@ if (-not $usingCDN) {
 }
 
 # Run standard Rust tests
-Run-Command -command "cargo test" -description "Running Rust unit tests" -isTest
+$testResult = Run-Command -command "cargo test" -description "Running Rust unit tests" -isTest -continueOnError
+
+if (-not $testResult) {
+    # When tests fail, we still want to attempt the WASM tests
+    Log-Output "WARNING: Rust unit tests failed, but continuing with WASM tests" "Yellow"
+}
 
 # Run wasm tests
-Run-Command -command "wasm-pack test --firefox --headless" -description "Running WebAssembly tests" -isTest
+$wasmTestResult = Run-Command -command "wasm-pack test --firefox --headless" -description "Running WebAssembly tests" -isTest -continueOnError
 
-Log-Output "SUCCESS: All tests passed successfully! 🎉" "Green"
+if ($testResult -and $wasmTestResult) {
+    Log-Output "SUCCESS: All tests passed successfully! 🎉" "Green"
+} else {
+    if (-not $testResult) {
+        Log-Output "ERROR: Rust unit tests failed" "Red"
+    }
+    if (-not $wasmTestResult) {
+        Log-Output "ERROR: WASM tests failed" "Red"
+    }
+}
 
 # Check if port is already in use
 if (Test-PortInUse -port $trunkPort) {
@@ -256,11 +307,20 @@ if (Test-PortInUse -port $trunkPort) {
     # Add final timestamp to log
     Add-Content -Path $logFile -Value "`n======================================================`nPort $trunkPort already in use - Trunk server not started: $(Get-Date)`n======================================================"
 } else {
-    Log-Output "PROGRESS: Starting Trunk development server on port $trunkPort..." "Cyan"
-    
-    # Add final timestamp to log
-    Add-Content -Path $logFile -Value "`n======================================================`nStarting Trunk server: $(Get-Date)`n======================================================"
-    
-    # Start the trunk server
-    trunk serve
+    # Only start Trunk if both tests passed
+    if ($testResult -and $wasmTestResult) {
+        Log-Output "PROGRESS: Starting Trunk development server on port $trunkPort..." "Cyan"
+        
+        # Add final timestamp to log
+        Add-Content -Path $logFile -Value "`n======================================================`nStarting Trunk server: $(Get-Date)`n======================================================"
+        
+        # Start the trunk server
+        trunk serve
+    } else {
+        Log-Output "WARNING: Not starting Trunk server due to test failures" "Yellow"
+        Log-Output "INFO: Fix the errors above before starting the server" "Yellow"
+        
+        # Add final timestamp to log
+        Add-Content -Path $logFile -Value "`n======================================================`nTrunk server not started due to test failures: $(Get-Date)`n======================================================"
+    }
 }

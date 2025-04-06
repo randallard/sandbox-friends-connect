@@ -1,3 +1,5 @@
+Here's the complete updated README.md for your project:
+
 # Sandbox for Friends-Connect
 
 A playground for developing and testing client functionality for the [friends-connect](https://github.com/randallard/friends-connect) API.
@@ -40,7 +42,10 @@ project_root/
 ├── src/
 │   ├── main.rs
 │   ├── app.rs
-│   └── test_utils.rs
+│   ├── theme.rs      # Theme management module
+│   ├── data.rs       # Data handling module
+│   ├── utils.rs      # Utility functions
+│   └── test_utils.rs # Test utilities
 ├── dist/             # Directory for compiled assets
 ├── index.html
 ├── input.css
@@ -130,6 +135,48 @@ This project uses:
 - [Leptos](https://leptos.dev/) for reactive web UI
 - [Tailwind CSS](https://tailwindcss.com/) for styling
 
+## Core Modules
+
+### Theme Module
+
+The `theme.rs` module provides a comprehensive theming system for the application with the following features:
+
+- **Theme Context**: Uses Leptos context system to provide theme state throughout the application
+- **Dark/Light Mode**: Implements toggle functionality with persistent storage
+- **Tailwind Integration**: Provides styling hooks that change based on current theme
+- **Reactive Components**: All theme styles update automatically when theme changes
+- **Themeable Components**: Includes styling hooks for containers, cards, buttons, headers, and more
+- **ThemeProvider Component**: Simple wrapper component to set up theme context in any part of the application
+- **Error Handling**: Robust error handling for local storage operations
+- **Accessibility**: Clearly indicates current theme state with appropriate icons and text
+- **Customizable**: Easy to extend with additional theme variables and style hooks
+
+To use the theme module in a component:
+
+```rust
+use crate::theme::{ThemeProvider, use_theme, use_button_class};
+
+#[component]
+fn MyComponent() -> impl IntoView {
+    // Access theme context
+    let theme = use_theme();
+    
+    // Get dynamic button styling
+    let button_class = use_button_class();
+    
+    // Toggle theme with click handler
+    let toggle_theme = move |_| {
+        theme.toggle_theme.dispatch(());
+    };
+    
+    view! {
+        <button class={button_class} on:click={toggle_theme}>
+            "Toggle Theme"
+        </button>
+    }
+}
+```
+
 ## Common Issues and Solutions
 
 ### Cross-platform compatibility
@@ -140,6 +187,22 @@ For Windows users:
 
 For Unix users:
 - Ensure shell scripts have execute permissions: `chmod +x *.sh`
+
+### Theme-related issues
+
+- **Theme not persisting between page reloads**: Check that localStorage is available and not blocked by browser settings
+- **Theme styles not updating**: Ensure you are using the reactive styling hooks from the theme module instead of static classes
+- **Custom theme styles not applying**: Verify your Tailwind configuration includes all required utility classes
+
+To troubleshoot theme issues, you can run the included tests:
+
+```bash
+# Run specific theme module tests
+cargo test --package friends-connect-sandbox --lib theme_tests
+
+# Run integration tests that include theme functionality
+cargo test --package friends-connect-sandbox --lib integration_tests
+```
 
 ## Contributing
 

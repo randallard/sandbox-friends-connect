@@ -15,10 +15,13 @@ web-sys = { version = "0.3", features = [
     "Window",
     "Document",
     "Element",
-    "HtmlElement",
+    "HtmlElement", 
     "CssStyleDeclaration",
     "console",
     "NodeList",
+    "DomTokenList",  # Add this for classList operations
+    "HtmlButtonElement",  # Add this for button click testing
+    "MouseEvent",  # Add this for click event simulation
 ]}
 wasm-bindgen = "0.2"
 
