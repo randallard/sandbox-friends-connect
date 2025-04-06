@@ -82,6 +82,19 @@ pub fn use_card_class() -> impl Fn() -> String {
     }
 }
 
+pub fn use_dark_mode_toggle_button_class() -> impl Fn() -> String {
+    let theme_state = use_context::<ThemeState>().expect("ThemeState should be provided");
+    let dark_mode = MaybeSignal::derive(move || theme_state.dark_mode);
+    
+    move || {
+        if dark_mode.get() {
+            "ml-4 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm transition-colors".to_string()
+        } else {
+            "ml-4 px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-sm transition-colors".to_string()
+        }
+    }
+}
+
 pub fn use_error_message_class() -> impl Fn() -> String {
     let theme_state = use_context::<ThemeState>().expect("ThemeState should be provided");
     let dark_mode = MaybeSignal::derive(move || theme_state.dark_mode);

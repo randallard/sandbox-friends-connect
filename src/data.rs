@@ -2,7 +2,8 @@ use leptos::*;
 use leptos::prelude::*;
 use crate::utils::get_player_id;
 use crate::theme::{
-    use_theme, 
+    use_theme,
+    use_dark_mode_toggle_button_class, 
     use_button_class, 
     use_data_panel_class, 
     use_data_header_class, 
@@ -42,6 +43,7 @@ pub fn DataButton() -> impl IntoView {
     }
     
     let player_id = create_rw_signal(id);
+    let dark_mode_preference = create_rw_signal(dark_mode);
 
     // Get the theme context
     let theme = use_theme();
@@ -63,6 +65,16 @@ pub fn DataButton() -> impl IntoView {
     // Click handler for the close button to hide the panel
     let hide_panel_click = move |_| {
         set_show_panel.set(false);
+    };
+
+    let toggle_dark_mode = move |_| {
+        theme.toggle_theme.dispatch(());
+        
+        // Log the dark mode change
+        let new_mode = if dark_mode { "Disabled" } else { "Enabled" };
+        let log_msg = format!("DARK_MODE_CHANGED: {}", !dark_mode);
+        log(&log_msg);
+        info!("{}", log_msg);
     };
 
     view! {
@@ -114,6 +126,13 @@ pub fn DataButton() -> impl IntoView {
                                                 </p>
                                                 <p>
                                                     {"Dark Mode: "}{if dark_mode { "Enabled" } else { "Disabled" }}
+                                                    <button
+                                                        data-test-id="dark-mode-toggle"
+                                                        class={use_dark_mode_toggle_button_class}
+                                                        on:click={toggle_dark_mode}
+                                                    >
+                                                        {if dark_mode { "Disable" } else { "Enable" }}
+                                                    </button>
                                                 </p>
                                             </div>
                                         }.into_any()
