@@ -7,6 +7,8 @@ mod theme;
 
 // Add our new test modules
 // #[cfg(test)]
+// mod app_tests;
+// #[cfg(test)]
 // mod mock_logger;
 // #[cfg(test)]
 // mod integration_tests;
@@ -14,8 +16,8 @@ mod theme;
 // mod log_integration_tests;
 // #[cfg(test)]
 // mod theme_tests;
-// #[cfg(test)]
-// mod data_tests;
+#[cfg(test)]
+mod data_tests;
 
 // #[cfg(test)]
 // mod theme_provider_tests;  

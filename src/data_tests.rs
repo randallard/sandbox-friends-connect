@@ -24,6 +24,29 @@ mod data_export_tests {
         localStorage::reset_all_storage();
         wait_for_storage().await;
     }
+
+    #[wasm_bindgen_test]
+    async fn test_load_button_exists() {
+        // Reset storage to ensure a clean state
+        reset_storage().await;
+        
+        // Mount the DataButton component
+        mount_to_body(|| view! {
+            <ThemeProvider>
+                <DataButton />
+            </ThemeProvider>
+        });
+        
+        // Click the data button to show the panel
+        let data_button = get_by_test_id("data-button");
+        click_and_wait(&data_button, 50).await;
+        
+        // Verify the data panel is shown
+        let data_panel = get_by_test_id("data-panel");
+        
+        // Check for the load button
+        let load_button = get_by_test_id("load-data-button");
+    }
     
     #[wasm_bindgen_test]
     async fn test_export_button_exists() {
