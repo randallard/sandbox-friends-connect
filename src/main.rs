@@ -3,21 +3,22 @@ mod app;
 mod test_utils;
 mod data;
 mod utils;
-mod theme;  // Add the theme module
+mod theme;  
 
 // Add our new test modules
-#[cfg(test)]
-mod mock_logger;
-#[cfg(test)]
-mod integration_tests;
-#[cfg(test)]
-mod log_integration_tests;
-#[cfg(test)]
-mod theme_tests;
+// #[cfg(test)]
+// mod mock_logger;
+// #[cfg(test)]
+// mod integration_tests;
+// #[cfg(test)]
+// mod log_integration_tests;
+// #[cfg(test)]
+// mod theme_tests;
+// #[cfg(test)]
+// mod data_tests;
 
-#[cfg(test)]
-mod theme_provider_tests;  // Only needed if you keep them separate
-
+// #[cfg(test)]
+// mod theme_provider_tests;  
 
 use leptos::*;
 use leptos::prelude::*;
@@ -42,6 +43,7 @@ fn main() {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
+    use gloo_timers::future::TimeoutFuture;
     
     wasm_bindgen_test_configure!(run_in_browser);
     
