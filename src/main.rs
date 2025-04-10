@@ -4,23 +4,23 @@ mod test_utils;
 mod data;
 mod utils;
 mod theme;  
+mod crypto;
 
-// Add our new test modules
-// #[cfg(test)]
-// mod app_tests;
-// #[cfg(test)]
-// mod mock_logger;
-// #[cfg(test)]
-// mod integration_tests;
-// #[cfg(test)]
-// mod log_integration_tests;
-// #[cfg(test)]
-// mod theme_tests;
 #[cfg(test)]
-mod data_tests;
-
+mod app_tests;
+#[cfg(test)]
+mod mock_logger;
+#[cfg(test)]
+mod integration_tests;
+#[cfg(test)]
+mod log_integration_tests;
+#[cfg(test)]
+mod theme_tests;
 // #[cfg(test)]
-// mod theme_provider_tests;  
+// mod data_tests;
+
+#[cfg(test)]
+mod theme_provider_tests;  
 
 use leptos::*;
 use leptos::prelude::*;

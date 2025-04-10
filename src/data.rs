@@ -80,11 +80,20 @@ pub fn trigger_download(content: &str, filename: &str) -> Result<(), JsValue> {
     Ok(())
 }
 
-/// Import application data from a JSON string
-/// Returns a Result with either a success message or an error
+// Import application data from a JSON string
+// Returns a Result with either a success message or an error
 pub fn import_data(json_data: &str) -> Result<String, String> {
+    // First, try to decrypt the data if it's encrypted
+    let decrypted_data = match crate::crypto::decrypt_data(json_data) {
+        Ok(decrypted) => decrypted,
+        Err(_) => {
+            // If decryption fails, assume it's not encrypted and proceed with original data
+            json_data.to_string()
+        }
+    };
+    
     // Parse the JSON string
-    let parsed_data: Result<ExportedData, _> = serde_json::from_str(json_data);
+    let parsed_data: Result<ExportedData, _> = serde_json::from_str(&decrypted_data);
     
     match parsed_data {
         Ok(data) => {
@@ -168,8 +177,19 @@ pub fn export_data() -> Result<String, String> {
     // Serialize to JSON
     match serde_json::to_string(&export_data) {
         Ok(json_string) => {
-            info!("Data successfully exported");
-            Ok(json_string)
+            info!("Data successfully serialized");
+            
+            // Encrypt the data before exporting
+            match crate::crypto::encrypt_data(&json_string) {
+                Ok(encrypted_data) => {
+                    info!("Data successfully encrypted and exported");
+                    Ok(encrypted_data)
+                },
+                Err(err) => {
+                    error!("Failed to encrypt export data: {:?}", err);
+                    Err(format!("Encryption error: {:?}", err))
+                }
+            }
         },
         Err(err) => {
             error!("Failed to serialize export data: {:?}", err);
@@ -177,8 +197,6 @@ pub fn export_data() -> Result<String, String> {
         }
     }
 }
-
-// Updated DataButton component with load functionality
 
 #[component]
 pub fn DataButton() -> impl IntoView {

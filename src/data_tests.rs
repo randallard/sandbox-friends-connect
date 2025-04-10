@@ -26,6 +26,74 @@ mod data_export_tests {
     }
 
     #[wasm_bindgen_test]
+    async fn test_load_data_validates_encrypted_json() {
+        // Reset storage to ensure a clean state
+        reset_storage().await;
+        
+        // Prepare test data
+        let test_data = json!({
+            "version": "1.0.0",
+            "timestamp": "2025-04-09T12:00:00Z",
+            "data": {
+                "player_id": "test_crypto_id_456",
+                "dark_mode": true
+            }
+        });
+        
+        // Convert to string and encrypt
+        let plain_json = test_data.to_string();
+        let encrypted_data = crate::crypto::encrypt_data(&plain_json)
+            .expect("Encryption should succeed with valid data");
+        
+        // Test case 1: Valid encrypted data should load successfully
+        let import_result = crate::data::import_data(&encrypted_data);
+        assert!(import_result.is_ok(), "Import should succeed with properly encrypted data: {:?}", import_result.err());
+        
+        // Wait for storage operations to complete
+        wait_for_storage().await;
+        
+        // Verify data was loaded correctly
+        let loaded_player_id = localStorage::get_storage_item("player_id")
+            .expect("Storage access should succeed")
+            .expect("player_id should exist after valid import");
+        
+        assert_eq!(loaded_player_id, "test_crypto_id_456", "Imported player_id should match test data");
+        
+        // Test case 2: Tampered data should fail to import
+        let tampered_data = encrypted_data.replace('A', "B"); // Simple tampering
+        let tampered_result = crate::data::import_data(&tampered_data);
+        
+        // The import should fail with a specific error about invalid signature/checksum
+        assert!(tampered_result.is_err(), "Import should fail with tampered encrypted data");
+        let error_msg = tampered_result.unwrap_err();
+        assert!(
+            error_msg.contains("signature") || error_msg.contains("decrypt") || error_msg.contains("integrity") || 
+            error_msg.contains("parse") || error_msg.contains("Invalid"),
+            "Error should indicate encryption/signature/parse failure: {}", error_msg
+        );
+        
+        // Reset storage for clean state
+        reset_storage().await;
+        
+        // Test case 3: Data with valid structure but invalid HMAC/signature should fail
+        // This simulates an attacker who knows the format but doesn't have the encryption key
+        let fake_data = json!({
+            "ciphertext": "ABCDEF1234567890",
+            "iv": "0123456789ABCDEF",
+            "tag": "INVALID0987654321"
+        }).to_string();
+        
+        let fake_result = crate::data::import_data(&fake_data);
+        assert!(fake_result.is_err(), "Import should fail with fake encrypted data");
+        let fake_error = fake_result.unwrap_err();
+        assert!(
+            fake_error.contains("signature") || fake_error.contains("decrypt") || fake_error.contains("integrity") || 
+            fake_error.contains("parse") || fake_error.contains("Invalid"),
+            "Error should indicate encryption validation failure: {}", fake_error
+        );
+    }
+
+    #[wasm_bindgen_test]
     async fn test_load_data_functionality() {
         // Reset storage to ensure a clean state with no data
         reset_storage().await;
@@ -147,8 +215,25 @@ mod data_export_tests {
     
     #[wasm_bindgen_test]
     async fn test_export_data_structure() {
-        // Call the export function to get the JSON data
-        let json_data = export_data().expect("Export should succeed in tests");
+        // Call the export function to get the encrypted data
+        let encrypted_data = export_data().expect("Export should succeed in tests");
+        
+        // Verify that it returns some data
+        assert!(!encrypted_data.is_empty(), "Export should return non-empty string");
+        
+        // First, verify the encrypted data structure
+        let encrypted_parsed: Result<Value, _> = serde_json::from_str(&encrypted_data);
+        assert!(encrypted_parsed.is_ok(), "Encrypted data should be valid JSON");
+        
+        let encrypted_obj = encrypted_parsed.unwrap();
+        
+        // Check for encryption fields
+        assert!(encrypted_obj.get("ciphertext").is_some(), "Encrypted data should include ciphertext field");
+        assert!(encrypted_obj.get("iv").is_some(), "Encrypted data should include iv field");
+        
+        // Now decrypt and check the actual data structure
+        let json_data = crate::crypto::decrypt_data(&encrypted_data)
+            .expect("Decryption should succeed with valid encrypted data");
         
         // Verify that it returns some data
         assert!(!json_data.is_empty(), "Export should return non-empty JSON string");
@@ -221,8 +306,14 @@ mod data_export_tests {
         // Wait for storage operations to complete
         wait_for_storage().await;
         
-        // Get exported data
-        let json_data = export_data().expect("Export should succeed with valid test data");
+        // Get encrypted exported data
+        let encrypted_data = export_data().expect("Export should succeed with valid test data");
+        
+        // Decrypt the data
+        let json_data = crate::crypto::decrypt_data(&encrypted_data)
+            .expect("Decryption should succeed with valid encrypted data");
+        
+        // Parse the data
         
         // Parse the data
         let parsed: Value = serde_json::from_str(&json_data).unwrap();
@@ -247,11 +338,15 @@ mod data_export_tests {
         localStorage::set_storage_item("dark_mode", "false");
         wait_for_storage().await;
         
-        // Export data
-        let json_data = export_data().expect("Export should succeed with valid test data");
+        let encrypted_data = export_data().expect("Export should succeed with valid test data");
+    
+        // Decrypt the data for testing
+        let json_data = crate::crypto::decrypt_data(&encrypted_data)
+            .expect("Decryption should succeed with valid encrypted data");
         
-        // This test just verifies that the data could be used for import
+        // This test verifies that the data could be used for import
         // by parsing it and checking that the fields needed for import are accessible
+        
         let parsed: Value = serde_json::from_str(&json_data).unwrap();
         
         // Access all fields that would be needed for import
