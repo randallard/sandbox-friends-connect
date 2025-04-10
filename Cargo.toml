@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+getrandom = { version = "0.2.15", features = ["js"] }
+aes-gcm = "0.10.3"
+base64 = "0.21.4"
 leptos = { version = "0.7.8", features = ["csr"] }
 leptos_meta = { version = "0.7.8" }  # No features needed
 leptos_router = { version = "0.7.8" } # No features needed for 0.7.8
@@ -18,6 +21,10 @@ web-sys = { version = "0.3", features = [
     "Window",
     "Document",
     "Element",
+    "File",
+    "FileList", 
+    "FileReader",
+    "HtmlInputElement",
     "HtmlElement", 
     "CssStyleDeclaration",
     "console",
