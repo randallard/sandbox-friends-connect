@@ -4,6 +4,7 @@ mod test_utils;
 mod data;
 mod utils;
 mod theme;  
+mod crypto;
 
 // Add our new test modules
 // #[cfg(test)]
