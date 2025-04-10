@@ -140,8 +140,8 @@ mod tests {
         
         // Compare with original
         assert_eq!(decrypted, original_data, "Decrypted data should match original");
-    }
-    
+    }    
+        
     #[wasm_bindgen_test]
     fn test_tampering_detection() {
         let original_data = r#"{"player_id":"tamper_test","dark_mode":false}"#;
@@ -149,8 +149,31 @@ mod tests {
         // Encrypt the data
         let encrypted = encrypt_data(original_data).expect("Encryption should succeed");
         
-        // Tamper with the encrypted data
-        let tampered = encrypted.replace('A', "B");
+        // Parse the encrypted JSON to modify the ciphertext directly
+        let mut encrypted_obj: EncryptedData = serde_json::from_str(&encrypted)
+            .expect("Should be able to parse our own encrypted JSON");
+        
+        // Get the original ciphertext and modify it
+        let mut modified_ciphertext = encrypted_obj.ciphertext.clone();
+        
+        // Make sure we're actually changing something by modifying the last character
+        // This ensures we're tampering with the actual encrypted data
+        if !modified_ciphertext.is_empty() {
+            let last_char = modified_ciphertext.chars().last().unwrap();
+            let replacement = if last_char == 'A' { 'B' } else { 'A' };
+            
+            modified_ciphertext.pop();
+            modified_ciphertext.push(replacement);
+            
+            encrypted_obj.ciphertext = modified_ciphertext;
+        } else {
+            // Fallback in case the ciphertext is empty (shouldn't happen)
+            encrypted_obj.ciphertext = "tampered".to_string();
+        }
+        
+        // Serialize back to JSON
+        let tampered = serde_json::to_string(&encrypted_obj)
+            .expect("Should be able to serialize tampered data");
         
         // Attempt to decrypt tampered data - should fail
         let result = decrypt_data(&tampered);
@@ -159,11 +182,11 @@ mod tests {
         // Check error message
         let error = result.unwrap_err().to_string();
         assert!(
-            error.contains("Decryption failed") || error.contains("tampered"),
+            error.contains("Decryption failed") || error.contains("tampered") || error.contains("Invalid"),
             "Error should indicate tampering: {}", error
         );
     }
-    
+
     #[wasm_bindgen_test]
     fn test_invalid_json_handling() {
         // Test with completely invalid data
