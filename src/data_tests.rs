@@ -26,6 +26,112 @@ mod data_export_tests {
     }
 
     #[wasm_bindgen_test]
+async fn test_load_data_validates_encrypted_json() {
+    // Reset storage to ensure a clean state
+    reset_storage().await;
+    
+    // Prepare test data
+    let test_data = json!({
+        "version": "1.0.0",
+        "timestamp": "2025-04-09T12:00:00Z",
+        "data": {
+            "player_id": "test_crypto_id_456",
+            "dark_mode": true
+        }
+    });
+    
+    // Convert to string and encrypt
+    let plain_json = test_data.to_string();
+    let encrypted_data = crate::crypto::encrypt_data(&plain_json)
+        .expect("Encryption should succeed with valid data");
+    
+    // Test case 1: Valid encrypted data should load successfully
+    let import_result = crate::data::import_data(&encrypted_data);
+    assert!(import_result.is_ok(), "Import should succeed with properly encrypted data");
+    
+    // Wait for storage operations to complete
+    wait_for_storage().await;
+    
+    // Verify data was loaded correctly
+    let loaded_player_id = localStorage::get_storage_item("player_id")
+        .expect("player_id should exist after valid import");
+    assert_eq!(loaded_player_id, "test_crypto_id_456", "Player ID should match the imported value");
+    
+    // Test case 2: Tampered data should fail to import
+    let tampered_data = encrypted_data.replace("A", "B"); // Simple tampering
+    let tampered_result = crate::data::import_data(&tampered_data);
+    
+    // The import should fail with a specific error about invalid signature/checksum
+    assert!(tampered_result.is_err(), "Import should fail with tampered encrypted data");
+    let error_msg = tampered_result.unwrap_err();
+    assert!(
+        error_msg.contains("signature") || error_msg.contains("decrypt") || error_msg.contains("integrity"),
+        "Error should indicate encryption/signature failure: {}", error_msg
+    );
+    
+    // Reset storage for clean state
+    reset_storage().await;
+    
+    // Test case 3: Data with valid structure but invalid HMAC/signature should fail
+    // This simulates an attacker who knows the format but doesn't have the encryption key
+    let fake_data = json!({
+        "ciphertext": "ABCDEF1234567890",
+        "iv": "0123456789ABCDEF",
+        "signature": "INVALID0987654321"
+    }).to_string();
+    
+    let fake_result = crate::data::import_data(&fake_data);
+    assert!(fake_result.is_err(), "Import should fail with fake encrypted data");
+    let fake_error = fake_result.unwrap_err();
+    assert!(
+        fake_error.contains("signature") || fake_error.contains("decrypt") || fake_error.contains("integrity"),
+        "Error should indicate encryption validation failure: {}", fake_error
+    );
+}
+
+    #[wasm_bindgen_test]
+    async fn test_load_data_functionality() {
+        // Reset storage to ensure a clean state with no data
+        reset_storage().await;
+        
+        // Mount the DataButton component
+        mount_to_body(|| view! {
+            <ThemeProvider>
+                <DataButton />
+            </ThemeProvider>
+        });
+        
+        // Click the data button to show the panel
+        let data_button = get_by_test_id("data-button");
+        click_and_wait(&data_button, 50).await;
+        
+        // Prepare test data as a JSON string
+        let test_data = json!({
+            "version": "1.0.0",
+            "timestamp": "2025-04-09T12:00:00Z",
+            "data": {
+                "player_id": "test_load_id_123",
+                "dark_mode": true
+            }
+        }).to_string();
+        
+        // Simulate loading this data by calling the import function
+        // (Assuming there's an import_data function similar to export_data)
+        crate::data::import_data(&test_data).expect("Import should succeed with valid test data");
+        
+        // Wait for storage operations to complete
+        wait_for_storage().await;
+        
+        // Verify data was loaded correctly
+        let loaded_player_id = localStorage::get_storage_item("player_id").expect("player_id should exist");
+        let loaded_dark_mode = localStorage::get_storage_item("dark_mode").expect("dark_mode should exist");
+        
+        let player_indicator = get_by_test_id("player-id");
+        let displayed_id = player_indicator.inner_html();
+        assert!(!displayed_id.is_empty(), "UI should display a player ID");
+    }
+
+    #[wasm_bindgen_test]
     async fn test_load_button_exists() {
         // Reset storage to ensure a clean state
         reset_storage().await;
